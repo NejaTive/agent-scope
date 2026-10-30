@@ -12,7 +12,7 @@ const items = computed<BrowserItem[]>(() =>
   scan.rules.map((r) => ({
     id: r.id,
     name: r.name,
-    subtitle: r.paths.length ? `Applies to ${r.paths.join(", ")}` : null,
+    subtitle: r.paths.length ? `Применяется к ${r.paths.join(", ")}` : null,
     scope: r.scope,
     status: r.status,
     mtime: r.mtime,
@@ -29,15 +29,15 @@ const items = computed<BrowserItem[]>(() =>
   <ArtifactBrowser
     :items="items"
     :loading="!scan.initialized"
-    empty-title="No rules found"
-    empty-description="Rules live in .claude/rules/*.md at user or project level."
+    empty-title="Правила не найдены"
+    empty-description="Правила лежат в .claude/rules/*.md на уровне пользователя или проекта."
   >
     <template #detail="{ item }">
       <FieldList
-        title="Scope"
+        title="Область"
         :fields="[
-          { label: 'Path globs', value: byId.get(item.id)?.paths },
-          { label: 'Conditional', value: byId.get(item.id)?.conditional ? 'yes (applies only to matching paths)' : null },
+          { label: 'Глобы путей', value: byId.get(item.id)?.paths },
+          { label: 'Условное', value: byId.get(item.id)?.conditional ? 'да (только для совпадающих путей)' : null },
         ]"
       />
     </template>

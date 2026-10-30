@@ -6,13 +6,13 @@ import type {
 } from "@/types/config";
 
 export const SCOPE_LABEL: Record<Scope, string> = {
-  managed: "Managed",
-  user: "User",
-  project: "Project",
-  projectLocal: "Local",
-  plugin: "Plugin",
-  nested: "Nested",
-  globalConfig: "Global config",
+  managed: "Управляемый",
+  user: "Пользователь",
+  project: "Проект",
+  projectLocal: "Локальный",
+  plugin: "Плагин",
+  nested: "Вложенный",
+  globalConfig: "Глобальная конфигурация",
 };
 
 export const SCOPE_ORDER: Scope[] = [
@@ -37,44 +37,44 @@ export const SCOPE_PRECEDENCE: Record<Scope, number> = {
 };
 
 export const KIND_LABEL: Record<ArtifactKind, string> = {
-  skill: "Skill",
-  command: "Command",
-  rule: "Rule",
-  agent: "Agent",
-  hook: "Hook",
-  mcpServer: "MCP server",
-  plugin: "Plugin",
-  settings: "Settings",
-  memory: "Memory",
+  skill: "Скилл",
+  command: "Команда",
+  rule: "Правило",
+  agent: "Агент",
+  hook: "Хук",
+  mcpServer: "MCP-сервер",
+  plugin: "Плагин",
+  settings: "Настройки",
+  memory: "Память",
   claudeMd: "CLAUDE.md",
-  workflow: "Workflow",
-  outputStyle: "Output style",
-  other: "Other",
+  workflow: "Воркфлоу",
+  outputStyle: "Стиль вывода",
+  other: "Прочее",
 };
 
 export const KIND_PLURAL: Record<ArtifactKind, string> = {
-  skill: "Skills",
-  command: "Commands",
-  rule: "Rules",
-  agent: "Agents",
-  hook: "Hooks",
-  mcpServer: "MCP servers",
-  plugin: "Plugins",
-  settings: "Settings",
-  memory: "Memory",
+  skill: "Скиллы",
+  command: "Команды",
+  rule: "Правила",
+  agent: "Агенты",
+  hook: "Хуки",
+  mcpServer: "MCP-серверы",
+  plugin: "Плагины",
+  settings: "Настройки",
+  memory: "Память",
   claudeMd: "CLAUDE.md",
-  workflow: "Workflows",
-  outputStyle: "Output styles",
-  other: "Other",
+  workflow: "Воркфлоу",
+  outputStyle: "Стили вывода",
+  other: "Прочее",
 };
 
 export const STATUS_LABEL: Record<DiscoveryStatus, string> = {
-  present: "Present",
-  missing: "Missing",
-  unreadable: "Unreadable",
-  invalidJson: "Invalid JSON",
-  invalidFrontmatter: "Invalid frontmatter",
-  partial: "Partial",
+  present: "Найден",
+  missing: "Отсутствует",
+  unreadable: "Нечитаемый",
+  invalidJson: "Невалидный JSON",
+  invalidFrontmatter: "Невалидный frontmatter",
+  partial: "Частичный",
 };
 
 export const STATUS_TONE: Record<
@@ -90,9 +90,9 @@ export const STATUS_TONE: Record<
 };
 
 export const CONFIDENCE_LABEL: Record<Confidence, string> = {
-  computed: "Computed",
-  inferred: "Inferred",
-  unknown: "Unknown",
+  computed: "Вычислено",
+  inferred: "Выведено",
+  unknown: "Неизвестно",
 };
 
 /** Route for each artifact kind (used by global search). */

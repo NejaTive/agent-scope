@@ -23,7 +23,7 @@ function onInput(e: Event) {
       spellcheck="false"
       autocomplete="off"
       class="input w-full pl-7 pr-6"
-      :placeholder="placeholder ?? 'Search…'"
+      :placeholder="placeholder ?? 'Поиск…'"
       @input="onInput"
       @focus="emit('focus')"
       @blur="emit('blur')"
@@ -34,7 +34,7 @@ function onInput(e: Event) {
       v-if="modelValue"
       type="button"
       class="absolute right-1.5 top-1/2 -translate-y-1/2 text-subtle hover:text-fg"
-      title="Clear"
+      title="Очистить"
       @mousedown.prevent
       @click="emit('update:modelValue', '')"
     >

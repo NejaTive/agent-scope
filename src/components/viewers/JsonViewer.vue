@@ -21,7 +21,7 @@ const parsed = computed<{ code: string; error: string | null }>(() => {
       const v = maskDeep(JSON.parse(props.text));
       return { code: JSON.stringify(v, null, 2), error: null };
     } catch (e) {
-      return { code: props.text, error: e instanceof Error ? e.message : "Invalid JSON" };
+      return { code: props.text, error: e instanceof Error ? e.message : "Некорректный JSON" };
     }
   }
   try {
@@ -38,7 +38,7 @@ const parsed = computed<{ code: string; error: string | null }>(() => {
       v-if="parsed.error"
       class="rounded-md border border-warn/30 bg-warn/10 px-2 py-1 text-xs text-warn"
     >
-      Not valid JSON: {{ parsed.error }}
+      Некорректный JSON: {{ parsed.error }}
     </div>
     <CodeViewer
       :code="parsed.code"

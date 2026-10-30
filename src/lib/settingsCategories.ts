@@ -20,14 +20,14 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
 ];
 
 export const CATEGORY_LABEL: Record<SettingsCategory, string> = {
-  General: "General",
-  Permissions: "Permissions",
-  Environment: "Environment",
-  Hooks: "Hooks",
-  Model: "Model",
-  MCP: "MCP-related",
-  Plugins: "Plugins",
-  Other: "Other",
+  General: "Общие",
+  Permissions: "Права доступа",
+  Environment: "Окружение",
+  Hooks: "Хуки",
+  Model: "Модель",
+  MCP: "Связанные с MCP",
+  Plugins: "Плагины",
+  Other: "Прочее",
 };
 
 const BY_KEY: Record<string, SettingsCategory> = {

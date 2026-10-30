@@ -24,7 +24,7 @@ const props = withDefaults(
     collapsedContent?: boolean;
     contentLabel?: string;
   }>(),
-  { collapsedContent: false, contentLabel: "File content" },
+  { collapsedContent: false, contentLabel: "Содержимое файла" },
 );
 
 const scan = useScanStore();
@@ -90,23 +90,23 @@ const status = computed(() => props.item.status ?? "present");
         <Badge v-if="kindLabel">{{ kindLabel }}</Badge>
         <ScopeBadge :scope="item.scope" />
         <Badge :tone="STATUS_TONE[status]">{{ STATUS_LABEL[status] }}</Badge>
-        <span class="ml-auto flex items-center gap-1 text-2xs text-subtle" title="This app never modifies Claude configuration">
-          <Icon name="lock" :size="11" /> read-only
+        <span class="ml-auto flex items-center gap-1 text-2xs text-subtle" title="Это приложение никогда не изменяет конфигурацию Claude">
+          <Icon name="lock" :size="11" /> только чтение
         </span>
       </div>
       <p v-if="item.subtitle" class="text-xs text-muted">{{ item.subtitle }}</p>
       <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-0.5 text-xs">
-        <dt class="text-subtle">Path</dt>
+        <dt class="text-subtle">Путь</dt>
         <dd class="break-all font-mono text-[11.5px] text-muted" :title="item.path">
           {{ shortenPath(item.path) }}
         </dd>
         <template v-if="item.projectPath">
-          <dt class="text-subtle">Project</dt>
+          <dt class="text-subtle">Проект</dt>
           <dd class="break-all font-mono text-[11.5px] text-muted">
             {{ shortenPath(item.projectPath) }}
           </dd>
         </template>
-        <dt class="text-subtle">Modified</dt>
+        <dt class="text-subtle">Изменён</dt>
         <dd class="text-muted">{{ formatTime(item.mtime) }}</dd>
       </dl>
     </div>
@@ -135,14 +135,14 @@ const status = computed(() => props.item.status ?? "present");
           <EmptyState
             v-else-if="item.status === 'missing'"
             compact
-            title="File not found"
-            description="The file was discovered earlier but no longer exists on disk."
+            title="Файл не найден"
+            description="Файл был обнаружен ранее, но больше не существует на диске."
           />
           <EmptyState
             v-else-if="error"
             compact
             tone="danger"
-            title="Could not load content"
+            title="Не удалось загрузить содержимое"
             :description="error"
           />
           <template v-else-if="content">

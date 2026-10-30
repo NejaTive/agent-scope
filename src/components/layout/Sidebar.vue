@@ -21,19 +21,19 @@ const route = useRoute();
 const main = computed<NavItem[]>(() => {
   const d = scan.dashboard;
   return [
-    { to: "/", label: "Overview", icon: "dashboard" },
-    { to: "/global", label: "Global Configuration", icon: "globe" },
-    { to: "/projects", label: "Projects", icon: "folder", count: d.projectCount, match: "/projects" },
-    { to: "/skills", label: "Skills", icon: "zap", count: scan.skillEntries.length },
-    { to: "/rules", label: "Rules", icon: "file-text", count: d.rules },
-    { to: "/agents", label: "Agents", icon: "bot", count: d.agents },
-    { to: "/hooks", label: "Hooks", icon: "link", count: d.hooks },
-    { to: "/mcp", label: "MCP Servers", icon: "server", count: d.mcpServers },
-    { to: "/plugins", label: "Plugins", icon: "box", count: d.plugins },
-    { to: "/permissions", label: "Permissions", icon: "shield" },
-    { to: "/settings", label: "Settings", icon: "sliders" },
-    { to: "/effective", label: "Effective Config", icon: "layers", count: d.conflictCount || undefined },
-    { to: "/memory", label: "Memory", icon: "database" },
+    { to: "/", label: "Обзор", icon: "dashboard" },
+    { to: "/global", label: "Глобальная конфигурация", icon: "globe" },
+    { to: "/projects", label: "Проекты", icon: "folder", count: d.projectCount, match: "/projects" },
+    { to: "/skills", label: "Скиллы", icon: "zap", count: scan.skillEntries.length },
+    { to: "/rules", label: "Правила", icon: "file-text", count: d.rules },
+    { to: "/agents", label: "Агенты", icon: "bot", count: d.agents },
+    { to: "/hooks", label: "Хуки", icon: "link", count: d.hooks },
+    { to: "/mcp", label: "MCP-серверы", icon: "server", count: d.mcpServers },
+    { to: "/plugins", label: "Плагины", icon: "box", count: d.plugins },
+    { to: "/permissions", label: "Права доступа", icon: "shield" },
+    { to: "/settings", label: "Настройки", icon: "sliders" },
+    { to: "/effective", label: "Эффективная конфигурация", icon: "layers", count: d.conflictCount || undefined },
+    { to: "/memory", label: "Память", icon: "database" },
   ];
 });
 
@@ -43,15 +43,15 @@ function isActive(item: NavItem): boolean {
 }
 
 const status = computed(() => {
-  if (scan.scanning) return { tone: "accent" as const, pulse: true, text: "Scanning…" };
+  if (scan.scanning) return { tone: "accent" as const, pulse: true, text: "Сканирование…" };
   if (scan.error && !scan.backendAvailable)
-    return { tone: "danger" as const, pulse: false, text: "Backend unavailable" };
-  if (scan.error) return { tone: "warn" as const, pulse: false, text: "Last scan failed" };
-  if (!scan.initialized) return { tone: "neutral" as const, pulse: true, text: "Starting…" };
+    return { tone: "danger" as const, pulse: false, text: "Бэкенд недоступен" };
+  if (scan.error) return { tone: "warn" as const, pulse: false, text: "Последнее сканирование не удалось" };
+  if (!scan.initialized) return { tone: "neutral" as const, pulse: true, text: "Запуск…" };
   return {
     tone: "ok" as const,
     pulse: false,
-    text: `Scanned ${relativeTime(scan.lastScanAt)}`,
+    text: `Сканировано ${relativeTime(scan.lastScanAt)}`,
   };
 });
 </script>
@@ -68,7 +68,7 @@ const status = computed(() => {
       <span class="text-[13px] font-semibold tracking-tight">Agent Scope</span>
     </div>
 
-    <nav class="flex-1 space-y-px overflow-y-auto px-2 pb-2" aria-label="Sections">
+    <nav class="flex-1 space-y-px overflow-y-auto px-2 pb-2" aria-label="Разделы">
       <RouterLink
         v-for="item in main"
         :key="item.to"
@@ -107,14 +107,14 @@ const status = computed(() => {
         "
       >
         <Icon name="settings" :size="15" class="text-subtle" />
-        App Settings
+        Настройки приложения
       </RouterLink>
       <div class="flex items-center justify-between gap-2 px-2 pt-1.5 text-2xs text-subtle">
         <span class="flex min-w-0 items-center gap-1.5" :title="scan.error ?? undefined">
           <StatusDot :tone="status.tone" :pulse="status.pulse" />
           <span class="truncate">{{ status.text }}</span>
         </span>
-        <RouterLink to="/app-settings" class="font-mono hover:text-fg" title="App settings">
+        <RouterLink to="/app-settings" class="font-mono hover:text-fg" title="Настройки приложения">
           v{{ scan.appInfo?.version ?? "0.1.0" }}
         </RouterLink>
       </div>

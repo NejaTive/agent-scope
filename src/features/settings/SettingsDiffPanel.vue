@@ -15,9 +15,9 @@ const props = defineProps<{ projectPath: string; query?: string }>();
 
 type Column = "user" | "project" | "local";
 const COLUMNS: Array<{ key: Column; label: string; pathKey: keyof SettingsDiff }> = [
-  { key: "user", label: "User", pathKey: "userPath" },
-  { key: "project", label: "Project", pathKey: "projectSettingsPath" },
-  { key: "local", label: "Local", pathKey: "localPath" },
+  { key: "user", label: "Пользователь", pathKey: "userPath" },
+  { key: "project", label: "Проект", pathKey: "projectSettingsPath" },
+  { key: "local", label: "Локальный", pathKey: "localPath" },
 ];
 /** Highest precedence first (managed is not part of the diff). */
 const PRECEDENCE: Column[] = ["local", "project", "user"];
@@ -59,25 +59,25 @@ function columnPath(c: (typeof COLUMNS)[number]): string | null {
 <template>
   <section>
     <div class="mb-2 flex items-center gap-2">
-      <h2 class="label">Settings diff across scopes</h2>
-      <span class="font-mono text-2xs text-subtle">{{ rows.length }} keys</span>
+      <h2 class="label">Diff настроек по областям</h2>
+      <span class="font-mono text-2xs text-subtle">{{ rows.length }} ключей</span>
     </div>
     <LoadingBlock v-if="diff.loading.value && !diff.data.value" :lines="4" />
     <div v-else-if="diff.error.value" class="card h-40">
-      <EmptyState compact tone="danger" title="Could not compute settings diff" :description="diff.error.value" />
+      <EmptyState compact tone="danger" title="Не удалось вычислить diff настроек" :description="diff.error.value" />
     </div>
     <div v-else-if="!rows.length" class="card h-32">
       <EmptyState
         compact
-        :title="totalRows ? 'No matching keys' : 'No settings to compare'"
-        :description="totalRows ? 'Adjust the search.' : 'No user, project or local settings define any keys for this project.'"
+        :title="totalRows ? 'Нет подходящих ключей' : 'Нет настроек для сравнения'"
+        :description="totalRows ? 'Измените поиск.' : 'Для этого проекта нет ключей в пользовательских, проектных или локальных настройках.'"
       />
     </div>
     <div v-else class="card overflow-x-auto">
       <table class="w-full border-collapse text-xs">
         <thead>
           <tr class="border-b border-line">
-            <th class="th">Key</th>
+            <th class="th">Ключ</th>
             <th v-for="c in COLUMNS" :key="c.key" class="th">
               {{ c.label }}
               <span
@@ -88,7 +88,7 @@ function columnPath(c: (typeof COLUMNS)[number]): string | null {
                 {{ shortenPath(columnPath(c)!) }}
               </span>
             </th>
-            <th class="th">Status</th>
+            <th class="th">Статус</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-line">
@@ -99,14 +99,14 @@ function columnPath(c: (typeof COLUMNS)[number]): string | null {
                 v-if="cell(r, c.key) !== null"
                 class="block break-all font-mono text-[11.5px]"
                 :class="r.differs && winner(r) === c.key ? 'text-accent' : 'text-muted'"
-                :title="r.differs && winner(r) === c.key ? 'Winning value' : undefined"
+                :title="r.differs && winner(r) === c.key ? 'Победившее значение' : undefined"
               >
                 {{ cell(r, c.key) }}
               </span>
               <span v-else class="text-subtle">—</span>
             </td>
             <td class="td">
-              <Badge :tone="r.differs ? 'warn' : 'neutral'">{{ r.differs ? "differs" : "same" }}</Badge>
+              <Badge :tone="r.differs ? 'warn' : 'neutral'">{{ r.differs ? "отличается" : "совпадает" }}</Badge>
             </td>
           </tr>
         </tbody>

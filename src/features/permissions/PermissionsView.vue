@@ -86,7 +86,7 @@ const parseErrors = computed(() => docs.value.filter((d) => d.error));
       <ProjectSelect />
       <div class="flex items-center gap-0.5">
         <button type="button" class="chip" :class="typeFilter === 'all' && 'chip-active'" @click="typeFilter = 'all'">
-          All <span class="font-mono text-2xs text-subtle">{{ rows.length }}</span>
+          Все <span class="font-mono text-2xs text-subtle">{{ rows.length }}</span>
         </button>
         <button
           v-for="t in (['deny', 'ask', 'allow', 'setting'] as const)"
@@ -96,13 +96,13 @@ const parseErrors = computed(() => docs.value.filter((d) => d.error));
           :class="typeFilter === t && 'chip-active'"
           @click="typeFilter = t"
         >
-          {{ t === "setting" ? "Mode & dirs" : t }}
+          {{ t === "setting" ? "Режим и каталоги" : t }}
           <span class="font-mono text-2xs text-subtle">{{ typeCounts[t] }}</span>
         </button>
       </div>
       <div class="flex items-center gap-0.5">
         <button type="button" class="chip" :class="scopeFilter === 'all' && 'chip-active'" @click="scopeFilter = 'all'">
-          All scopes
+          Все области
         </button>
         <button
           v-for="s in scopes"
@@ -122,7 +122,7 @@ const parseErrors = computed(() => docs.value.filter((d) => d.error));
       :key="d.artifact.id"
       class="shrink-0 border-b border-warn/30 bg-warn/10 px-4 py-1 text-xs text-warn"
     >
-      Could not parse {{ shortenPath(d.artifact.path) }}: {{ d.error }}
+      Не удалось разобрать {{ shortenPath(d.artifact.path) }}: {{ d.error }}
     </div>
 
     <div class="min-h-0 flex-1 overflow-auto">
@@ -130,20 +130,20 @@ const parseErrors = computed(() => docs.value.filter((d) => d.error));
       <EmptyState
         v-else-if="!filtered.length"
         icon="shield"
-        :title="rows.length ? 'No matching permissions' : 'No permission rules found'"
+        :title="rows.length ? 'Нет подходящих прав' : 'Правила прав доступа не найдены'"
         :description="
           rows.length
-            ? 'Adjust the filters or search.'
-            : 'No settings file defines a `permissions` key in the selected scopes.'
+            ? 'Измените фильтры или поиск.'
+            : 'Ни один файл настроек не задаёт ключ `permissions` в выбранных областях.'
         "
       />
       <table v-else class="w-full border-collapse text-xs">
         <thead>
           <tr class="border-b border-line">
-            <th class="th w-20">Type</th>
-            <th class="th">Rule</th>
-            <th class="th w-24">Scope</th>
-            <th class="th">Source file</th>
+            <th class="th w-20">Тип</th>
+            <th class="th">Правило</th>
+            <th class="th w-24">Область</th>
+            <th class="th">Исходный файл</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-line">

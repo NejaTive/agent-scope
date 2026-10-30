@@ -87,7 +87,7 @@ const selectedProject = computed(() =>
 <template>
   <div class="flex h-full min-h-0">
     <aside class="flex w-52 shrink-0 flex-col border-r border-line">
-      <div class="shrink-0 border-b border-line px-3 py-2"><ProjectSelect all-label="All scopes" /></div>
+      <div class="shrink-0 border-b border-line px-3 py-2"><ProjectSelect all-label="Все области" /></div>
       <nav class="flex-1 space-y-px overflow-y-auto p-2">
         <button
           type="button"
@@ -95,7 +95,7 @@ const selectedProject = computed(() =>
           :class="category === 'all' ? 'bg-elevated text-fg' : 'text-muted hover:bg-elevated/60 hover:text-fg'"
           @click="category = 'all'"
         >
-          All settings <span class="font-mono text-2xs text-subtle">{{ rows.length }}</span>
+          Все настройки <span class="font-mono text-2xs text-subtle">{{ rows.length }}</span>
         </button>
         <button
           v-for="c in SETTINGS_CATEGORIES"
@@ -110,7 +110,7 @@ const selectedProject = computed(() =>
         </button>
       </nav>
       <div class="shrink-0 border-t border-line px-3 py-2 text-2xs text-subtle">
-        <div class="mb-1 flex items-center gap-1"><Icon name="lock" :size="11" /> Read-only</div>
+        <div class="mb-1 flex items-center gap-1"><Icon name="lock" :size="11" /> Только чтение</div>
         <div v-for="d in sources" :key="d.artifact.id" class="flex items-center justify-between gap-2 py-px">
           <ScopeBadge :scope="d.artifact.scope" />
           <span :title="d.artifact.path">{{ relativeTime(d.artifact.modifiedAt) }}</span>
@@ -125,18 +125,18 @@ const selectedProject = computed(() =>
           :key="d.artifact.id"
           class="rounded-md border border-warn/30 bg-warn/10 px-3 py-1.5 text-xs text-warn"
         >
-          Could not parse {{ shortenPath(d.artifact.path) }}: {{ d.error }}
+          Не удалось разобрать {{ shortenPath(d.artifact.path) }}: {{ d.error }}
         </div>
 
         <LoadingBlock v-if="(loading || !scan.initialized) && !rows.length" :lines="8" />
         <div v-else-if="!visible.length" class="card h-56">
           <EmptyState
             icon="sliders"
-            :title="rows.length ? 'No matching settings' : 'No settings files found'"
+            :title="rows.length ? 'Нет подходящих настроек' : 'Файлы настроек не найдены'"
             :description="
               rows.length
-                ? 'Adjust the category or search.'
-                : 'No settings.json / settings.local.json / managed settings were discovered.'
+                ? 'Измените категорию или поиск.'
+                : 'Не обнаружены settings.json / settings.local.json / управляемые настройки.'
             "
           />
         </div>
@@ -162,7 +162,7 @@ const selectedProject = computed(() =>
 
         <SettingsDiffPanel v-if="selectedProject" :project-path="selectedProject.path" :query="search" />
         <p v-else class="flex items-center gap-1.5 text-2xs text-subtle">
-          <Icon name="eye" :size="11" /> Select a project to also see a settings diff across scopes.
+          <Icon name="eye" :size="11" /> Выберите проект, чтобы увидеть diff настроек по областям.
         </p>
       </div>
     </div>

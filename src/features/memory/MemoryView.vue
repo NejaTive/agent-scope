@@ -19,7 +19,7 @@ const items = computed(() =>
     :items="items"
     :loading="!scan.initialized"
     kind-filter
-    empty-title="No memory files found"
-    empty-description="CLAUDE.md files, auto-memory, workflows and output styles discovered in scanned scopes show up here."
+    empty-title="Файлы памяти не найдены"
+    empty-description="Файлы CLAUDE.md, auto-memory, workflows и output styles из просканированных областей отображаются здесь."
   />
 </template>

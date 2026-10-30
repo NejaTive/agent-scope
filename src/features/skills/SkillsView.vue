@@ -57,8 +57,8 @@ const items = computed<BrowserItem[]>(() =>
   <ArtifactBrowser
     :items="items"
     :loading="!scan.initialized"
-    :empty-title="tab === 'skill' ? 'No skills found' : 'No commands found'"
-    empty-description="Skills live in .claude/skills/<name>/SKILL.md; commands in .claude/commands/. Run a scan after adding project roots."
+    :empty-title="tab === 'skill' ? 'Скиллы не найдены' : 'Команды не найдены'"
+    empty-description="Скиллы лежат в .claude/skills/<name>/SKILL.md; команды — в .claude/commands/. Запустите сканирование после добавления корней проектов."
   >
     <template #header>
       <div class="flex shrink-0 items-center gap-0.5 border-b border-line px-2 py-1.5" role="tablist">
@@ -70,7 +70,7 @@ const items = computed<BrowserItem[]>(() =>
           :aria-selected="tab === 'skill'"
           @click="tab = 'skill'"
         >
-          Skills <span class="font-mono text-2xs text-subtle">{{ scan.skills.length }}</span>
+          Скиллы <span class="font-mono text-2xs text-subtle">{{ scan.skills.length }}</span>
         </button>
         <button
           type="button"
@@ -80,7 +80,7 @@ const items = computed<BrowserItem[]>(() =>
           :aria-selected="tab === 'command'"
           @click="tab = 'command'"
         >
-          Commands <span class="font-mono text-2xs text-subtle">{{ scan.commands.length }}</span>
+          Команды <span class="font-mono text-2xs text-subtle">{{ scan.commands.length }}</span>
         </button>
       </div>
     </template>
@@ -89,10 +89,10 @@ const items = computed<BrowserItem[]>(() =>
         v-if="byId.get(item.id)"
         title="Frontmatter"
         :fields="[
-          { label: 'Argument hint', value: fmOf(item.id, 'argument-hint') },
-          { label: 'Model', value: fmOf(item.id, 'model') },
-          { label: 'Allowed tools', value: fmOf(item.id, 'allowed-tools') },
-          { label: 'Files', value: byId.get(item.id)?.files },
+          { label: 'Подсказка аргументов', value: fmOf(item.id, 'argument-hint') },
+          { label: 'Модель', value: fmOf(item.id, 'model') },
+          { label: 'Разрешённые инструменты', value: fmOf(item.id, 'allowed-tools') },
+          { label: 'Файлы', value: byId.get(item.id)?.files },
         ]"
       />
     </template>

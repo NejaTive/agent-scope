@@ -29,16 +29,16 @@ const items = computed<BrowserItem[]>(() =>
   <ArtifactBrowser
     :items="items"
     :loading="!scan.initialized"
-    empty-title="No agents found"
-    empty-description="Subagents live in .claude/agents/*.md at user or project level."
+    empty-title="Агенты не найдены"
+    empty-description="Субагенты лежат в .claude/agents/*.md на уровне пользователя или проекта."
   >
     <template #detail="{ item }">
       <FieldList
         title="Frontmatter"
         :fields="[
-          { label: 'Model', value: byId.get(item.id)?.model },
-          { label: 'Tools', value: byId.get(item.id)?.tools },
-          { label: 'Valid', value: byId.get(item.id)?.valid === false ? 'missing name or description' : null },
+          { label: 'Модель', value: byId.get(item.id)?.model },
+          { label: 'Инструменты', value: byId.get(item.id)?.tools },
+          { label: 'Валидность', value: byId.get(item.id)?.valid === false ? 'нет имени или описания' : null },
         ]"
       />
     </template>

@@ -10,9 +10,9 @@ const prefs = usePreferencesStore();
 const scan = useScanStore();
 
 const THEMES: Array<{ value: ThemePreference; label: string }> = [
-  { value: "dark", label: "Dark" },
-  { value: "light", label: "Light" },
-  { value: "system", label: "System" },
+  { value: "dark", label: "Тёмная" },
+  { value: "light", label: "Светлая" },
+  { value: "system", label: "Системная" },
 ];
 </script>
 
@@ -23,15 +23,15 @@ const THEMES: Array<{ value: ThemePreference; label: string }> = [
         v-if="prefs.error"
         class="rounded-md border border-warn/30 bg-warn/10 px-3 py-1.5 text-xs text-warn"
       >
-        Preferences could not be synced with the backend ({{ prefs.error }}). Changes are kept locally.
+        Не удалось синхронизировать настройки с бэкендом ({{ prefs.error }}). Изменения сохранены локально.
       </div>
 
       <section>
-        <h2 class="label mb-2">Appearance</h2>
+        <h2 class="label mb-2">Внешний вид</h2>
         <div class="card flex items-center justify-between gap-4 px-3 py-2.5">
           <div>
-            <div class="text-[13px] font-medium">Theme</div>
-            <div class="text-xs text-muted">Dark is the default. System follows your OS setting.</div>
+            <div class="text-[13px] font-medium">Тема</div>
+            <div class="text-xs text-muted">По умолчанию — тёмная. Системная следует за настройкой ОС.</div>
           </div>
           <div class="flex items-center gap-0.5 rounded-md border border-line p-0.5">
             <button
@@ -49,14 +49,14 @@ const THEMES: Array<{ value: ThemePreference; label: string }> = [
       </section>
 
       <section>
-        <h2 class="label mb-2">Scanning</h2>
+        <h2 class="label mb-2">Сканирование</h2>
         <div class="card divide-y divide-line">
           <label class="flex cursor-pointer items-center justify-between gap-4 px-3 py-2.5">
             <div>
-              <div class="text-[13px] font-medium">Watch for file changes on start</div>
+              <div class="text-[13px] font-medium">Отслеживать изменения файлов при запуске</div>
               <div class="text-xs text-muted">
-                Soft-refresh automatically when Claude config files change on disk. Toggling this starts or stops
-                the watcher immediately.
+                Автоматическое мягкое обновление при изменении конфигурации Claude на диске. Переключение сразу запускает или останавливает
+                наблюдатель.
               </div>
             </div>
             <input
@@ -68,8 +68,8 @@ const THEMES: Array<{ value: ThemePreference; label: string }> = [
           </label>
           <label class="flex cursor-pointer items-center justify-between gap-4 px-3 py-2.5">
             <div>
-              <div class="text-[13px] font-medium">Notifications</div>
-              <div class="text-xs text-muted">Notify when Claude config files change on disk.</div>
+              <div class="text-[13px] font-medium">Уведомления</div>
+              <div class="text-xs text-muted">Уведомлять об изменении конфигурации Claude на диске.</div>
             </div>
             <input
               type="checkbox"
@@ -79,44 +79,44 @@ const THEMES: Array<{ value: ThemePreference; label: string }> = [
             />
           </label>
           <div class="px-3 py-2.5">
-            <div class="mb-1 text-[13px] font-medium">Scan roots</div>
+            <div class="mb-1 text-[13px] font-medium">Корни сканирования</div>
             <ul v-if="scan.scanRoots.length" class="space-y-0.5">
               <li v-for="r in scan.scanRoots" :key="r.path" class="font-mono text-[11.5px] text-muted">
                 {{ shortenPath(r.path) }}
               </li>
             </ul>
-            <p v-else class="text-xs text-muted">None configured.</p>
+            <p v-else class="text-xs text-muted">Не заданы.</p>
             <RouterLink to="/projects" class="mt-1.5 inline-block text-xs text-accent hover:underline">
-              Manage on the Projects page →
+              Управление на странице «Проекты» →
             </RouterLink>
           </div>
         </div>
       </section>
 
       <section>
-        <h2 class="label mb-2">About</h2>
+        <h2 class="label mb-2">О приложении</h2>
         <dl class="card grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 px-3 py-2.5 text-xs">
-          <dt class="text-subtle">Name</dt>
+          <dt class="text-subtle">Название</dt>
           <dd>{{ scan.appInfo?.name ?? "Agent Scope" }}</dd>
-          <dt class="text-subtle">Version</dt>
+          <dt class="text-subtle">Версия</dt>
           <dd class="font-mono">{{ scan.appInfo?.version ?? "0.1.0" }}</dd>
           <template v-if="scan.globalMeta.configDir">
-            <dt class="text-subtle">Claude home</dt>
+            <dt class="text-subtle">Каталог Claude</dt>
             <dd class="break-all font-mono">{{ shortenPath(scan.globalMeta.configDir) }}</dd>
           </template>
           <template v-if="scan.globalMeta.managedDir">
-            <dt class="text-subtle">Managed dir</dt>
+            <dt class="text-subtle">Управляемый каталог</dt>
             <dd class="break-all font-mono">{{ shortenPath(scan.globalMeta.managedDir) }}</dd>
           </template>
-          <dt class="text-subtle">Backend</dt>
+          <dt class="text-subtle">Бэкенд</dt>
           <dd>
             <Badge :tone="scan.backendAvailable ? 'ok' : 'danger'">
-              {{ scan.backendAvailable ? "connected" : "unavailable" }}
+              {{ scan.backendAvailable ? "подключён" : "недоступен" }}
             </Badge>
           </dd>
         </dl>
         <p class="mt-2 flex items-center gap-1.5 text-2xs text-subtle">
-          <Icon name="lock" :size="11" /> Agent Scope is read-only: it never creates, edits or deletes Claude configuration.
+          <Icon name="lock" :size="11" /> Agent Scope только для чтения: не создаёт, не изменяет и не удаляет конфигурацию Claude.
         </p>
       </section>
     </div>

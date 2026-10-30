@@ -41,7 +41,7 @@ onBeforeUnmount(() => scan.stopListening());
       >
         <Icon name="alert" :size="14" class="mt-px" />
         <span class="min-w-0 flex-1 break-words">
-          {{ scan.backendAvailable ? "Scan error" : "Backend not reachable" }}: {{ scan.error }}
+          {{ scan.backendAvailable ? "Ошибка сканирования" : "Бэкенд недоступен" }}: {{ scan.error }}
         </span>
       </div>
       <main class="min-h-0 flex-1 overflow-hidden">

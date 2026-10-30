@@ -27,7 +27,10 @@ const searchable = computed(() => !!route.meta.searchable);
 const themeIcon = computed(() =>
   theme.preference.value === "dark" ? "moon" : theme.preference.value === "light" ? "sun" : "monitor",
 );
-const themeLabel = computed(() => `Theme: ${theme.preference.value} (click to change)`);
+const THEME_RU: Record<string, string> = { dark: "тёмная", light: "светлая", system: "системная" };
+const themeLabel = computed(
+  () => `Тема: ${THEME_RU[theme.preference.value] ?? theme.preference.value} (нажмите, чтобы сменить)`,
+);
 
 const changeCount = computed(() => scan.recentChanges.length);
 
@@ -89,7 +92,7 @@ function openHit(hit: SearchHit) {
     <div class="relative w-72">
       <SearchInput
         v-model="search"
-        :placeholder="searchable ? 'Filter this view · search all…' : 'Search all artifacts…'"
+        :placeholder="searchable ? 'Фильтр вида · поиск по всем…' : 'Поиск по всем артефактам…'"
         @focus="focused = true"
         @blur="focused = false"
       />
@@ -97,7 +100,7 @@ function openHit(hit: SearchHit) {
         v-if="showDropdown"
         class="absolute left-0 right-0 top-8 z-30 overflow-hidden rounded-md border border-line bg-surface shadow-lg shadow-black/30"
       >
-        <div v-if="searching && !hits.length" class="px-3 py-2 text-xs text-muted">Searching…</div>
+        <div v-if="searching && !hits.length" class="px-3 py-2 text-xs text-muted">Поиск…</div>
         <button
           v-for="hit in hits"
           :key="hit.id"
@@ -121,8 +124,8 @@ function openHit(hit: SearchHit) {
         class="btn-ghost relative"
         :title="
           ui.unseenChanges
-            ? `${ui.unseenChanges} new change(s) detected`
-            : `${changeCount} recent change(s)`
+            ? `${ui.unseenChanges} новых изменений`
+            : `${changeCount} недавних изменений`
         "
         @click="openChanges"
       >
@@ -138,11 +141,11 @@ function openHit(hit: SearchHit) {
         type="button"
         class="btn"
         :disabled="scan.scanning"
-        title="Rescan configuration"
+        title="Пересканировать конфигурацию"
         @click="scan.refresh()"
       >
         <Icon name="refresh" :size="13" :class="scan.scanning && 'animate-spin'" />
-        Refresh
+        Обновить
       </button>
 
       <button type="button" class="btn-ghost !px-1.5" :title="themeLabel" @click="theme.cycle()">

@@ -30,22 +30,22 @@ const items = computed<BrowserItem[]>(() =>
     :items="items"
     :loading="!scan.initialized"
     collapsed-content
-    content-label="Source file"
-    empty-title="No hooks configured"
-    empty-description="Hooks are declared in settings.json (user, project or local) and in plugins."
+    content-label="Исходный файл"
+    empty-title="Хуки не настроены"
+    empty-description="Хуки объявляются в settings.json (пользователь, проект или локальный) и в плагинах."
   >
     <template #detail="{ item }">
       <FieldList
         v-if="byId.get(item.id)"
-        title="Hook"
+        title="Хук"
         :fields="[
-          { label: 'Event', value: byId.get(item.id)?.event },
-          { label: 'Matcher', value: byId.get(item.id)?.matcher },
-          { label: 'Type', value: byId.get(item.id)?.hookType },
-          { label: 'Command', value: byId.get(item.id)?.command },
-          { label: 'Timeout', value: byId.get(item.id)?.timeout != null ? `${byId.get(item.id)?.timeout}s` : null },
-          { label: 'Prompt', value: byId.get(item.id)?.prompt },
-          { label: 'Declared in', value: byId.get(item.id)?.sourcePath },
+          { label: 'Событие', value: byId.get(item.id)?.event },
+          { label: 'Матчер', value: byId.get(item.id)?.matcher },
+          { label: 'Тип', value: byId.get(item.id)?.hookType },
+          { label: 'Команда', value: byId.get(item.id)?.command },
+          { label: 'Таймаут', value: byId.get(item.id)?.timeout != null ? `${byId.get(item.id)?.timeout}s` : null },
+          { label: 'Промпт', value: byId.get(item.id)?.prompt },
+          { label: 'Объявлен в', value: byId.get(item.id)?.sourcePath },
         ]"
       />
     </template>

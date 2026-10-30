@@ -17,24 +17,24 @@ onMounted(() => ui.markChangesSeen());
 const cards = computed(() => {
   const d = scan.dashboard;
   return [
-    { label: "Projects", value: d.projectCount, to: "/projects" },
-    { label: "Global skills", value: d.globalSkills, to: "/skills" },
-    { label: "Project skills", value: d.projectSkills, to: "/skills" },
-    { label: "Rules", value: d.rules, to: "/rules" },
-    { label: "Agents", value: d.agents, to: "/agents" },
-    { label: "Hooks", value: d.hooks, to: "/hooks" },
-    { label: "MCP servers", value: d.mcpServers, to: "/mcp" },
-    { label: "Plugins", value: d.plugins, to: "/plugins" },
-    { label: "Commands", value: d.commands, to: "/skills" },
-    { label: "Memory files", value: d.memories, to: "/memory" },
-    { label: "Conflicts", value: d.conflictCount, to: "/effective", warn: d.conflictCount > 0 },
+    { label: "Проекты", value: d.projectCount, to: "/projects" },
+    { label: "Глобальные скиллы", value: d.globalSkills, to: "/skills" },
+    { label: "Проектные скиллы", value: d.projectSkills, to: "/skills" },
+    { label: "Правила", value: d.rules, to: "/rules" },
+    { label: "Агенты", value: d.agents, to: "/agents" },
+    { label: "Хуки", value: d.hooks, to: "/hooks" },
+    { label: "MCP-серверы", value: d.mcpServers, to: "/mcp" },
+    { label: "Плагины", value: d.plugins, to: "/plugins" },
+    { label: "Команды", value: d.commands, to: "/skills" },
+    { label: "Файлы памяти", value: d.memories, to: "/memory" },
+    { label: "Конфликты", value: d.conflictCount, to: "/effective", warn: d.conflictCount > 0 },
   ];
 });
 
 const CONFLICT_KIND_LABEL: Record<string, string> = {
-  duplicateName: "duplicate name",
-  mcpMismatch: "MCP mismatch",
-  settingOverride: "setting override",
+  duplicateName: "дубликат имени",
+  mcpMismatch: "несовпадение MCP",
+  settingOverride: "переопределение настройки",
 };
 
 const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
@@ -70,7 +70,7 @@ const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
             </div>
           </button>
           <div class="card px-3 py-2.5">
-            <div class="label">Last scan</div>
+            <div class="label">Последнее сканирование</div>
             <div class="mt-1 text-[13px] font-medium">{{ relativeTime(scan.lastScanAt) }}</div>
             <div class="text-2xs text-subtle">
               {{ formatTime(scan.lastScanAt) }}
@@ -81,7 +81,7 @@ const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
       </section>
 
       <section v-if="scan.scanErrors.length">
-        <h2 class="label mb-2">Scan errors ({{ scan.scanErrors.length }})</h2>
+        <h2 class="label mb-2">Ошибки сканирования ({{ scan.scanErrors.length }})</h2>
         <ul class="card divide-y divide-line">
           <li v-for="(e, i) in scan.scanErrors" :key="i" class="flex flex-col gap-0.5 px-3 py-1.5">
             <span class="break-all font-mono text-[11.5px] text-muted">{{ shortenPath(e.path) }}</span>
@@ -91,7 +91,7 @@ const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
       </section>
 
       <section v-if="scan.conflicts.length">
-        <h2 class="label mb-2">Conflicts ({{ scan.conflicts.length }})</h2>
+        <h2 class="label mb-2">Конфликты ({{ scan.conflicts.length }})</h2>
         <ul class="card divide-y divide-line">
           <li v-for="(c, i) in scan.conflicts" :key="c.id ?? i" class="flex items-start gap-2 px-3 py-1.5">
             <Badge :tone="c.severity === 'info' ? 'info' : 'warn'">{{ c.severity }}</Badge>
@@ -110,13 +110,13 @@ const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
       </section>
 
       <section>
-        <h2 class="label mb-2">Recent changes</h2>
+        <h2 class="label mb-2">Недавние изменения</h2>
         <div v-if="!scan.recentChanges.length" class="card h-40">
           <EmptyState
             compact
             icon="activity"
-            title="No recent changes"
-            description="File changes under watched Claude config locations will appear here."
+            title="Нет недавних изменений"
+            description="Изменения файлов в отслеживаемых каталогах конфигурации Claude появятся здесь."
           />
         </div>
         <ul v-else class="card divide-y divide-line">

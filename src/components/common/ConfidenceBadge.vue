@@ -18,7 +18,7 @@ const dot = computed(() => (tone.value === "info" ? "accent" : tone.value) as "o
 </script>
 
 <template>
-  <Badge :tone="tone" :title="`Confidence: ${confidence}`">
+  <Badge :tone="tone" :title="`Уверенность: ${confidence}`">
     <StatusDot :tone="dot" />
     {{ CONFIDENCE_LABEL[confidence] ?? confidence }}
   </Badge>

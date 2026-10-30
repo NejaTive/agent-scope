@@ -16,7 +16,7 @@ export function toDate(ts: Timestamp | undefined): Date | null {
 export function formatTime(ts: Timestamp | undefined): string {
   const d = toDate(ts);
   if (!d) return "—";
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString("ru", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -27,17 +27,17 @@ export function formatTime(ts: Timestamp | undefined): string {
 
 export function relativeTime(ts: Timestamp | undefined, now = Date.now()): string {
   const d = toDate(ts);
-  if (!d) return "never";
+  if (!d) return "никогда";
   const s = Math.round((now - d.getTime()) / 1000);
-  if (s < 5) return "just now";
-  if (s < 60) return `${s}s ago`;
+  if (s < 5) return "только что";
+  if (s < 60) return `${s} с назад`;
   const m = Math.round(s / 60);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return `${m} мин назад`;
   const h = Math.round(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return `${h} ч назад`;
   const days = Math.round(h / 24);
-  if (days < 30) return `${days}d ago`;
-  return d.toLocaleDateString();
+  if (days < 30) return `${days} дн. назад`;
+  return d.toLocaleDateString("ru");
 }
 
 export function basename(path: string): string {

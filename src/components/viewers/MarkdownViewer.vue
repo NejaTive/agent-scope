@@ -28,7 +28,7 @@ const md = new Marked({
       return `<a href="${escapeHtml(href)}"${t} data-external="true">${label}</a>`;
     },
     image({ text }) {
-      return escapeHtml(text ? `[image: ${text}]` : "[image]");
+      return escapeHtml(text ? `[изображение: ${text}]` : "[изображение]");
     },
   },
 });

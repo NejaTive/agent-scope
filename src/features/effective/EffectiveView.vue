@@ -55,6 +55,11 @@ const rows = computed(() =>
 );
 
 const CONFIDENCES: Confidence[] = ["computed", "inferred", "unknown"];
+const CONFIDENCE_LABEL: Record<Confidence, string> = {
+  computed: "Вычислено",
+  inferred: "Выведено",
+  unknown: "Неизвестно",
+};
 const confCounts = computed(() => {
   const m = new Map<Confidence, number>();
   for (const r of settings.data.value) m.set(r.confidence, (m.get(r.confidence) ?? 0) + 1);
@@ -67,30 +72,30 @@ const display = (r: ResolvedSetting) => formatValue(maskIfSecret(r.key, r.value)
 <template>
   <div class="flex h-full min-h-0 flex-col">
     <div class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-line px-4 py-2">
-      <ProjectSelect all-label="User + managed only" />
+      <ProjectSelect all-label="Только пользователь + управляемый" />
       <div class="flex items-center gap-0.5">
         <button type="button" class="chip" :class="confidence === 'all' && 'chip-active'" @click="confidence = 'all'">
-          All <span class="font-mono text-2xs text-subtle">{{ settings.data.value.length }}</span>
+          Все <span class="font-mono text-2xs text-subtle">{{ settings.data.value.length }}</span>
         </button>
         <button
           v-for="c in CONFIDENCES.filter((x) => confCounts.has(x))"
           :key="c"
           type="button"
-          class="chip capitalize"
+          class="chip"
           :class="confidence === c && 'chip-active'"
           @click="confidence = c"
         >
-          {{ c }} <span class="font-mono text-2xs text-subtle">{{ confCounts.get(c) }}</span>
+          {{ CONFIDENCE_LABEL[c] }} <span class="font-mono text-2xs text-subtle">{{ confCounts.get(c) }}</span>
         </button>
       </div>
       <span class="ml-auto text-2xs text-subtle">
-        Resolved by precedence: managed › local › project › user. Confidence: computed = merged exactly, inferred = best guess.
+        Разрешение по приоритету: управляемый › локальный › проект › пользователь. Уверенность: вычислено = точное слияние, выведено = лучшая оценка.
       </span>
     </div>
 
     <div class="min-h-0 flex-1 overflow-auto">
       <section v-if="conflicts.length" class="border-b border-line bg-warn/5 px-4 py-2">
-        <div class="label mb-1 !text-warn">Conflicts ({{ conflicts.length }})</div>
+        <div class="label mb-1 !text-warn">Конфликты ({{ conflicts.length }})</div>
         <ul class="space-y-1">
           <li v-for="c in conflicts" :key="c.id" class="flex items-start gap-2 text-xs">
             <Badge :tone="c.severity === 'info' ? 'info' : 'warn'">{{ c.severity }}</Badge>
@@ -107,27 +112,27 @@ const display = (r: ResolvedSetting) => formatValue(maskIfSecret(r.key, r.value)
       <EmptyState
         v-else-if="settings.error.value"
         tone="danger"
-        title="Could not resolve effective settings"
+        title="Не удалось разрешить эффективную конфигурацию"
         :description="settings.error.value"
       />
       <EmptyState
         v-else-if="!rows.length"
         icon="layers"
-        :title="settings.data.value.length ? 'No matching settings' : 'No effective settings'"
+        :title="settings.data.value.length ? 'Нет подходящих настроек' : 'Нет эффективной конфигурации'"
         :description="
           settings.data.value.length
-            ? 'Adjust the confidence filter or search.'
-            : 'No settings were resolved. Run a scan, or pick a project.'
+            ? 'Измените фильтр уверенности или поиск.'
+            : 'Настройки не разрешены. Запустите сканирование или выберите проект.'
         "
       />
       <table v-else class="w-full border-collapse text-xs">
         <thead>
           <tr class="border-b border-line">
             <th class="th w-6" />
-            <th class="th">Key</th>
-            <th class="th">Value</th>
-            <th class="th w-24">From</th>
-            <th class="th w-28">Confidence</th>
+            <th class="th">Ключ</th>
+            <th class="th">Значение</th>
+            <th class="th w-24">Источник</th>
+            <th class="th w-28">Уверенность</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-line">
@@ -144,14 +149,14 @@ const display = (r: ResolvedSetting) => formatValue(maskIfSecret(r.key, r.value)
             <tr v-if="expanded.has(r.key)" class="bg-elevated/30">
               <td />
               <td colspan="4" class="space-y-1.5 px-3 py-2">
-                <p class="text-xs text-muted">{{ r.explanation || "No explanation provided." }}</p>
+                <p class="text-xs text-muted">{{ r.explanation || "Пояснение не указано." }}</p>
                 <p v-if="r.sourcePath" class="break-all font-mono text-2xs text-subtle">
                   {{ shortenPath(r.sourcePath) }}
                 </p>
                 <div v-if="r.sources.length">
                   <div class="label mb-1 flex items-center gap-1.5">
-                    Sources (highest precedence first)
-                    <Badge v-if="r.merged" tone="info">merged</Badge>
+                    Источники (сначала высший приоритет)
+                    <Badge v-if="r.merged" tone="info">слияние</Badge>
                   </div>
                   <ul class="space-y-0.5">
                     <li v-for="(o, i) in r.sources" :key="`${o.path}-${i}`" class="flex items-center gap-2 text-xs">

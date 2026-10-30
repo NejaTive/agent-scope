@@ -3,7 +3,7 @@ import { computed, ref, toRef, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { useSearch } from "@/composables/useSearch";
 import { useUiStore } from "@/stores/ui";
-import { KIND_LABEL, KIND_PLURAL, SCOPE_LABEL, SCOPE_ORDER, SCOPE_PRECEDENCE, STATUS_TONE } from "@/lib/labels";
+import { KIND_LABEL, KIND_PLURAL, SCOPE_LABEL, SCOPE_ORDER, SCOPE_PRECEDENCE, STATUS_LABEL, STATUS_TONE } from "@/lib/labels";
 import { relativeTime, shortenPath } from "@/lib/format";
 import type { BrowserItem } from "@/lib/browser";
 import type { ArtifactKind } from "@/types/config";
@@ -30,12 +30,12 @@ const props = withDefaults(
   }>(),
   {
     loading: false,
-    emptyTitle: "Nothing found",
-    emptyDescription: "No matching items were discovered.",
+    emptyTitle: "Ничего не найдено",
+    emptyDescription: "Подходящие элементы не обнаружены.",
     kindFilter: false,
     showKind: false,
     collapsedContent: false,
-    contentLabel: "File content",
+    contentLabel: "Содержимое файла",
     listWidth: 340,
   },
 );
@@ -126,7 +126,7 @@ const kindLabel = (k: string) => KIND_PLURAL[k as ArtifactKind] ?? k;
             :class="kind === 'all' && 'chip-active'"
             @click="kind = 'all'"
           >
-            All kinds
+            Все типы
           </button>
           <button
             v-for="[k, n] in kindCounts"
@@ -146,7 +146,7 @@ const kindLabel = (k: string) => KIND_PLURAL[k as ArtifactKind] ?? k;
             :class="scope === 'all' && 'chip-active'"
             @click="scope = 'all'"
           >
-            All
+            Все
           </button>
           <button
             v-for="c in scopeChips"
@@ -168,8 +168,8 @@ const kindLabel = (k: string) => KIND_PLURAL[k as ArtifactKind] ?? k;
         <EmptyState
           v-else-if="!sorted.length"
           compact
-          :title="items.length ? 'No matches' : emptyTitle"
-          :description="items.length ? 'Adjust the search or scope filter.' : emptyDescription"
+          :title="items.length ? 'Нет совпадений' : emptyTitle"
+          :description="items.length ? 'Измените поиск или фильтр области.' : emptyDescription"
         />
         <ul v-else class="py-1" role="listbox">
           <li v-for="item in sorted" :key="item.id" role="option" :aria-selected="item.id === selectedId">
@@ -187,7 +187,7 @@ const kindLabel = (k: string) => KIND_PLURAL[k as ArtifactKind] ?? k;
                 <StatusDot
                   v-if="item.status && item.status !== 'present'"
                   :tone="STATUS_TONE[item.status] === 'neutral' ? 'neutral' : STATUS_TONE[item.status]"
-                  :title="item.status"
+                  :title="STATUS_LABEL[item.status]"
                 />
                 <span class="min-w-0 flex-1 truncate text-[13px] font-medium">{{ item.name }}</span>
                 <Badge v-if="showKind && item.kind">{{ KIND_LABEL[item.kind as ArtifactKind] ?? item.kind }}</Badge>
@@ -216,7 +216,7 @@ const kindLabel = (k: string) => KIND_PLURAL[k as ArtifactKind] ?? k;
           <slot name="detail" :item="selected" />
         </template>
       </ArtifactDetail>
-      <EmptyState v-else title="Select an item" description="Choose an entry on the left to inspect it." icon="eye" />
+      <EmptyState v-else title="Выберите элемент" description="Выберите запись слева, чтобы просмотреть её." icon="eye" />
     </section>
   </div>
 </template>

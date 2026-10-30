@@ -73,23 +73,23 @@ const items = computed<BrowserItem[]>(() => {
   <div v-if="!project" class="h-full">
     <EmptyState
       icon="folder"
-      title="Project not found"
-      description="This project is no longer in the app's project list."
+      title="Проект не найден"
+      description="Этот проект больше не в списке проектов приложения."
     >
-      <RouterLink to="/projects" class="btn">Back to projects</RouterLink>
+      <RouterLink to="/projects" class="btn">К проектам</RouterLink>
     </EmptyState>
   </div>
 
   <div v-else class="flex h-full min-h-0 flex-col">
     <div class="flex shrink-0 items-center gap-3 border-b border-line px-4 py-2">
-      <RouterLink to="/projects" class="btn-ghost !px-1.5" title="Back to projects">
+      <RouterLink to="/projects" class="btn-ghost !px-1.5" title="К проектам">
         <Icon name="chevron-right" :size="14" class="rotate-180" />
       </RouterLink>
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2">
           <span class="truncate text-[13px] font-semibold">{{ project.name }}</span>
-          <Badge v-if="project.pinned" tone="accent">pinned</Badge>
-          <Badge v-if="!project.hasClaudeDir">no .claude</Badge>
+          <Badge v-if="project.pinned" tone="accent">закреплён</Badge>
+          <Badge v-if="!project.hasClaudeDir">нет .claude</Badge>
         </div>
         <div class="truncate font-mono text-2xs text-subtle" :title="project.path">
           {{ shortenPath(project.path) }}
@@ -97,10 +97,10 @@ const items = computed<BrowserItem[]>(() => {
       </div>
       <div class="flex items-center gap-0.5" role="tablist">
         <button type="button" class="chip" :class="tab === 'inventory' && 'chip-active'" @click="tab = 'inventory'">
-          Inventory <span class="font-mono text-2xs text-subtle">{{ items.length }}</span>
+          Инвентарь <span class="font-mono text-2xs text-subtle">{{ items.length }}</span>
         </button>
         <button type="button" class="chip" :class="tab === 'diff' && 'chip-active'" @click="tab = 'diff'">
-          Settings diff
+          Diff настроек
         </button>
       </div>
     </div>
@@ -111,8 +111,8 @@ const items = computed<BrowserItem[]>(() => {
         :items="items"
         :loading="!scan.initialized"
         kind-filter
-        empty-title="No project-level configuration"
-        empty-description="No .claude directory, CLAUDE.md or .mcp.json was found in this project."
+        empty-title="Нет проектной конфигурации"
+        empty-description="В этом проекте не найдены каталог .claude, CLAUDE.md или .mcp.json."
       />
       <div v-else class="h-full overflow-y-auto">
         <div class="mx-auto max-w-5xl px-6 py-5">

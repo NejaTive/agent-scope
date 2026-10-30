@@ -46,7 +46,7 @@ export function useSettingsDocs() {
           if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
             return { artifact, data: parsed as Record<string, unknown>, error: null };
           }
-          return { artifact, data: null, error: "Settings file is not a JSON object" };
+          return { artifact, data: null, error: "Файл настроек не является JSON-объектом" };
         } catch (e) {
           return { artifact, data: null, error: errMsg(e) };
         }

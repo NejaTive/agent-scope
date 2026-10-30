@@ -1,76 +1,76 @@
 # Agent Scope
 
-Local macOS desktop app for **viewing and analyzing** Claude Code configuration — global and project scopes — without modifying files.
+Локальное macOS-приложение для **просмотра и анализа** конфигурации Claude Code — глобальной и проектной областей — без изменения файлов.
 
-Built with **Tauri 2**, **Rust**, **Vue 3**, TypeScript, Tailwind.
+Стек: **Tauri 2**, **Rust**, **Vue 3**, TypeScript, Tailwind.
 
-## What it does
+## Что делает
 
-- Scans `~/.claude` (or `CLAUDE_CONFIG_DIR`) and managed macOS paths
-- Discovers projects under user-selected roots (or add a project manually)
-- Explores Skills, Commands, Rules, Agents, Hooks, MCP, Plugins, Settings, Memory
-- Shows Effective Configuration with explicit confidence (`computed` / `inferred` / `unknown`)
-- Detects conflicts (duplicate names, MCP mismatches, setting overrides)
-- Watches config files and lists recent changes
+- Сканирует `~/.claude` (или `CLAUDE_CONFIG_DIR`) и управляемые пути macOS
+- Находит проекты в выбранных корнях (или добавляет проект вручную)
+- Показывает Skills, Commands, Rules, Agents, Hooks, MCP, Plugins, Settings, Memory
+- Показывает эффективную конфигурацию с явной уверенностью (`computed` / `inferred` / `unknown`)
+- Обнаруживает конфликты (дубли имён, расхождения MCP, переопределения настроек)
+- Отслеживает файлы конфигурации и показывает недавние изменения
 
-## What it does **not** do
+## Чего не делает
 
-- Does not create, edit, or delete Claude Code config (read-only UI)
-- Does not run hooks, MCP servers, or shell commands from configs
-- Does not display credential file contents or unmasked secrets by default
+- Не создаёт, не редактирует и не удаляет конфигурацию Claude Code (UI только для чтения)
+- Не запускает хуки, MCP-серверы и shell-команды из конфигов
+- По умолчанию не показывает содержимое credential-файлов и незамаскированные секреты
 
-## Requirements
+## Требования
 
-- macOS 11+ (Apple Silicon; Intel via cross-compile / universal build)
+- macOS 11+ (Apple Silicon; Intel через cross-compile / universal build)
 - [Node.js](https://nodejs.org/) 20+
 - [Rust](https://rustup.rs/) stable
 - Xcode Command Line Tools
 
-## Develop
+## Разработка
 
 ```bash
 npm install
 npm run tauri:dev
 ```
 
-Frontend only (no IPC):
+Только фронтенд (без IPC):
 
 ```bash
 npm run dev
 ```
 
-## Test
+## Тесты
 
 ```bash
 cd src-tauri && cargo test
 npm run build   # vue-tsc + vite
 ```
 
-## Build macOS app / DMG
+## Сборка macOS-приложения / DMG
 
 ```bash
 npm run tauri:build
 ```
 
-Artifacts land under `src-tauri/target/release/bundle/` (`.app`, `.dmg`).
+Артефакты: `src-tauri/target/release/bundle/` (`.app`, `.dmg`).
 
-### Notes
+### Замечания
 
-- Grant folder access when picking scan roots / projects (minimal TCC; no Full Disk Access required for user-chosen paths).
-- First scan of large trees may take a few seconds; excluded dirs: `node_modules`, `target`, `dist`, `build`, `.git`, etc.
+- При выборе корней сканирования / проектов нужно дать доступ к папкам (минимальный TCC; Full Disk Access для выбранных пользователем путей не требуется).
+- Первый скан больших деревьев может занять несколько секунд; исключаются: `node_modules`, `target`, `dist`, `build`, `.git` и т.п.
 
-## App data
+## Данные приложения
 
-SQLite preferences / scan roots / change history:
+SQLite (предпочтения / корни сканирования / история изменений):
 
 `~/Library/Application Support/com.agentscope.desktop/agent-scope.sqlite`
 
-Claude configs stay in their original files.
+Конфиги Claude остаются в исходных файлах.
 
-## Spec
+## Спецификация
 
-See [docs/spec/claude-code.md](docs/spec/claude-code.md).
+См. [docs/spec/claude-code.md](docs/spec/claude-code.md).
 
-## License
+## Лицензия
 
-Private / pet project unless otherwise stated.
+Private / pet project, если не указано иное.

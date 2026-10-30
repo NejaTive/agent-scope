@@ -3,7 +3,7 @@ import { storeToRefs } from "pinia";
 import { useScanStore } from "@/stores/scan";
 import { useUiStore } from "@/stores/ui";
 
-withDefaults(defineProps<{ allLabel?: string }>(), { allLabel: "All projects" });
+withDefaults(defineProps<{ allLabel?: string }>(), { allLabel: "Все проекты" });
 
 const scan = useScanStore();
 const { selectedProjectPath } = storeToRefs(useUiStore());
@@ -16,7 +16,7 @@ function onChange(e: Event) {
 
 <template>
   <label class="flex items-center gap-1.5 text-xs text-muted">
-    <span>Project</span>
+    <span>Проект</span>
     <select
       class="input max-w-[260px] pr-6"
       :value="selectedProjectPath ?? ''"

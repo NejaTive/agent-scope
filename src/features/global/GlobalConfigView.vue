@@ -25,7 +25,7 @@ const hasManaged = computed(() => items.value.some((i) => i.scope === "managed")
       class="flex shrink-0 items-center gap-2 border-b border-line bg-elevated/40 px-4 py-1.5 text-xs text-muted"
     >
       <Icon name="lock" :size="12" />
-      Managed settings are enforced by your organisation and shown for reference only.
+      Управляемые настройки задаются организацией и показаны только для справки.
     </div>
     <div class="min-h-0 flex-1">
       <ArtifactBrowser
@@ -33,8 +33,8 @@ const hasManaged = computed(() => items.value.some((i) => i.scope === "managed")
         :loading="!scan.initialized"
         kind-filter
         show-kind
-        empty-title="No global configuration found"
-        empty-description="Nothing was discovered under ~/.claude or managed locations. Run a scan to refresh."
+        empty-title="Глобальная конфигурация не найдена"
+        empty-description="Ничего не обнаружено в ~/.claude или управляемых каталогах. Запустите сканирование для обновления."
       />
     </div>
   </div>

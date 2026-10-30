@@ -29,10 +29,10 @@ const projects = computed(() =>
 function counts(p: ProjectInfo) {
   const own = (e: { projectPath?: string | null }) => e.projectPath === p.path;
   return [
-    { label: "skills", n: scan.skillEntries.filter(own).length },
-    { label: "rules", n: scan.rules.filter(own).length },
-    { label: "agents", n: scan.agents.filter(own).length },
-    { label: "hooks", n: scan.hooks.filter(own).length },
+    { label: "скиллы", n: scan.skillEntries.filter(own).length },
+    { label: "правила", n: scan.rules.filter(own).length },
+    { label: "агенты", n: scan.agents.filter(own).length },
+    { label: "хуки", n: scan.hooks.filter(own).length },
     { label: "mcp", n: scan.mcpServers.filter(own).length },
   ].filter((x) => x.n > 0);
 }
@@ -57,22 +57,22 @@ async function removeRoot(path: string) {
     <div class="mx-auto max-w-5xl space-y-6 px-6 py-5">
       <section class="flex flex-wrap items-center gap-2">
         <button type="button" class="btn-accent" @click="scan.addProjectFromPicker()">
-          <Icon name="plus" :size="13" /> Add project…
+          <Icon name="plus" :size="13" /> Добавить проект…
         </button>
         <button type="button" class="btn" @click="scan.addScanRootFromPicker()">
-          <Icon name="folder" :size="13" /> Add scan root…
+          <Icon name="folder" :size="13" /> Добавить корень сканирования…
         </button>
         <span class="ml-auto flex items-center gap-1 text-2xs text-subtle">
           <Icon name="lock" :size="11" />
-          Removing only hides a project from this app — files on disk are never touched.
+          Удаление только скрывает проект из приложения — файлы на диске не затрагиваются.
         </span>
       </section>
 
       <section>
-        <h2 class="label mb-2">Scan roots ({{ scan.scanRoots.length }})</h2>
+        <h2 class="label mb-2">Корни сканирования ({{ scan.scanRoots.length }})</h2>
         <div v-if="!scan.scanRoots.length" class="card px-3 py-2 text-xs text-muted">
-          No scan roots. Add a folder (e.g. <span class="font-mono">~/Projects</span>) to auto-discover projects
-          containing Claude config.
+          Нет корней сканирования. Добавьте папку (например <span class="font-mono">~/Projects</span>), чтобы автоматически находить проекты
+          с конфигурацией Claude.
         </div>
         <ul v-else class="card divide-y divide-line">
           <li v-for="r in scan.scanRoots" :key="r.path" class="flex items-center gap-2 px-3 py-1.5">
@@ -81,10 +81,10 @@ async function removeRoot(path: string) {
               {{ shortenPath(r.path) }}
             </span>
             <template v-if="confirmingRoot === r.path">
-              <button type="button" class="btn !h-6 text-danger" @click="removeRoot(r.path)">Remove from list</button>
-              <button type="button" class="btn-ghost !h-6" @click="confirmingRoot = null">Cancel</button>
+              <button type="button" class="btn !h-6 text-danger" @click="removeRoot(r.path)">Убрать из списка</button>
+              <button type="button" class="btn-ghost !h-6" @click="confirmingRoot = null">Отмена</button>
             </template>
-            <button v-else type="button" class="btn-ghost !h-6" title="Remove scan root from app" @click="confirmingRoot = r.path">
+            <button v-else type="button" class="btn-ghost !h-6" title="Убрать корень сканирования из приложения" @click="confirmingRoot = r.path">
               <Icon name="x" :size="12" />
             </button>
           </li>
@@ -92,16 +92,16 @@ async function removeRoot(path: string) {
       </section>
 
       <section>
-        <h2 class="label mb-2">Projects ({{ projects.length }})</h2>
+        <h2 class="label mb-2">Проекты ({{ projects.length }})</h2>
         <LoadingBlock v-if="!scan.initialized" :lines="4" />
         <div v-else-if="!projects.length" class="card h-48">
           <EmptyState
             icon="folder"
-            :title="scan.projects.length ? 'No matching projects' : 'No projects yet'"
+            :title="scan.projects.length ? 'Нет подходящих проектов' : 'Пока нет проектов'"
             :description="
               scan.projects.length
-                ? 'Clear the search to see all projects.'
-                : 'Add a project folder or a scan root to start inspecting project-level Claude configuration.'
+                ? 'Очистите поиск, чтобы увидеть все проекты.'
+                : 'Добавьте папку проекта или корень сканирования, чтобы начать просмотр проектной конфигурации Claude.'
             "
           />
         </div>
@@ -110,9 +110,9 @@ async function removeRoot(path: string) {
             <button type="button" class="flex min-w-0 flex-1 flex-col gap-0.5 text-left" @click="open(p)">
               <span class="flex items-center gap-2">
                 <span class="truncate text-[13px] font-medium">{{ p.name }}</span>
-                <Badge v-if="p.pinned" tone="accent">pinned</Badge>
-                <Badge v-if="p.discovered && !p.pinned">discovered</Badge>
-                <Badge v-if="!p.hasClaudeDir">no .claude</Badge>
+                <Badge v-if="p.pinned" tone="accent">закреплён</Badge>
+                <Badge v-if="p.discovered && !p.pinned">обнаружен</Badge>
+                <Badge v-if="!p.hasClaudeDir">нет .claude</Badge>
                 <Badge v-if="p.hasClaudeMd" mono>CLAUDE.md</Badge>
                 <Badge v-if="p.hasMcpJson" mono>.mcp.json</Badge>
               </span>
@@ -121,18 +121,18 @@ async function removeRoot(path: string) {
             <div class="flex items-center gap-1">
               <Badge v-for="c in counts(p)" :key="c.label" mono>{{ c.n }} {{ c.label }}</Badge>
             </div>
-            <span class="w-24 shrink-0 text-right text-2xs text-subtle">{{ p.artifactCount }} artifacts</span>
+            <span class="w-24 shrink-0 text-right text-2xs text-subtle">{{ p.artifactCount }} артефактов</span>
             <div class="flex items-center gap-1">
-              <button type="button" class="btn !h-6" @click="open(p)">Inventory</button>
+              <button type="button" class="btn !h-6" @click="open(p)">Инвентарь</button>
               <template v-if="confirming === p.path">
-                <button type="button" class="btn !h-6 text-danger" @click="remove(p)">Remove from list</button>
-                <button type="button" class="btn-ghost !h-6" @click="confirming = null">Cancel</button>
+                <button type="button" class="btn !h-6 text-danger" @click="remove(p)">Убрать из списка</button>
+                <button type="button" class="btn-ghost !h-6" @click="confirming = null">Отмена</button>
               </template>
               <button
                 v-else
                 type="button"
                 class="btn-ghost !h-6 opacity-0 group-hover:opacity-100"
-                title="Remove from app list (does not delete files)"
+                title="Убрать из списка приложения (файлы не удаляются)"
                 @click="confirming = p.path"
               >
                 <Icon name="x" :size="12" />

@@ -29,10 +29,10 @@ const items = computed<BrowserItem[]>(() =>
 
 function connectionFields(s: McpServerEntry): Field[] {
   return [
-    { label: "Type", value: s.serverType },
-    { label: "Origin", value: s.origin },
-    { label: "Command", value: s.command },
-    { label: "Args", value: s.args },
+    { label: "Тип", value: s.serverType },
+    { label: "Источник", value: s.origin },
+    { label: "Команда", value: s.command },
+    { label: "Аргументы", value: s.args },
     { label: "URL", value: s.url },
   ];
 }
@@ -53,25 +53,25 @@ function recordFields(prefix: string, s: McpServerEntry, key: string): Field[] {
     :items="items"
     :loading="!scan.initialized"
     collapsed-content
-    content-label="Source file"
-    empty-title="No MCP servers configured"
-    empty-description="Servers are declared in .mcp.json, ~/.claude.json and settings files."
+    content-label="Исходный файл"
+    empty-title="MCP-серверы не настроены"
+    empty-description="Серверы объявляются в .mcp.json, ~/.claude.json и файлах настроек."
   >
     <template #detail="{ item }">
       <template v-if="byId.get(item.id)">
-        <FieldList title="Connection" :fields="connectionFields(byId.get(item.id)!)" />
+        <FieldList title="Подключение" :fields="connectionFields(byId.get(item.id)!)" />
         <FieldList
           v-if="recordFields('env', byId.get(item.id)!, 'env').length"
-          title="Environment"
+          title="Окружение"
           :fields="recordFields('env', byId.get(item.id)!, 'env')"
         />
         <FieldList
           v-if="recordFields('header', byId.get(item.id)!, 'headers').length"
-          title="Headers"
+          title="Заголовки"
           :fields="recordFields('header', byId.get(item.id)!, 'headers')"
         />
         <p class="flex items-center gap-1.5 text-2xs text-subtle">
-          <Badge tone="neutral">masked</Badge> Secret values are redacted before display.
+          <Badge tone="neutral">скрыто</Badge> Секретные значения маскируются перед показом.
         </p>
       </template>
     </template>

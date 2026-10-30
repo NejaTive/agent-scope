@@ -1,6 +1,6 @@
 <script setup lang="ts">
 withDefaults(defineProps<{ label?: string; lines?: number }>(), {
-  label: "Loading…",
+  label: "Загрузка…",
   lines: 0,
 });
 </script>

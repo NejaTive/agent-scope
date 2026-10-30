@@ -12,7 +12,7 @@ const items = computed(() => scan.plugins.map(artifactToItem));
   <ArtifactBrowser
     :items="items"
     :loading="!scan.initialized"
-    empty-title="No plugins found"
-    empty-description="Installed plugins and enabledPlugins entries appear here after a scan."
+    empty-title="Плагины не найдены"
+    empty-description="Установленные плагины и записи enabledPlugins появляются здесь после сканирования."
   />
 </template>

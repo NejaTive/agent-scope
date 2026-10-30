@@ -38,7 +38,7 @@ async function copy() {
       @click="copy"
     >
       <Icon name="copy" :size="12" />
-      {{ copied ? "Copied" : "Copy" }}
+      {{ copied ? "Скопировано" : "Копировать" }}
     </button>
     <div class="flex overflow-auto" :style="maxHeight ? { maxHeight } : undefined">
       <pre
