@@ -22,6 +22,14 @@ permissions:
 jobs:
   release-macos:
     runs-on: macos-14
+    # Map secrets to env so optional signing can be gated without `secrets` in `if:`
+    # (GitHub rejects `secrets.*` inside `if` expressions).
+    env:
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,13 +51,10 @@ jobs:
             npm install
           fi
 
-      # Optional: import Developer ID cert + notarize when secrets are present.
+      # Optional: import Developer ID cert when secrets are present.
       # Keep this gated so CI stays green without an Apple Developer account.
       - name: Import Apple signing certificate
-        if: ${{ secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' }}
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        if: env.APPLE_CERTIFICATE != '' && env.APPLE_CERTIFICATE_PASSWORD != ''
         run: |
           CERTIFICATE_PATH="$RUNNER_TEMP/build_certificate.p12"
           KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
@@ -65,12 +70,7 @@ jobs:
           echo "Apple certificate imported (signing enabled for this run)."
 
       - name: Build Tauri app (DMG)
-        # When APPLE_* secrets are set, configure TAURI_SIGNING / notarization
-        # env here (product-specific). Without secrets, build proceeds unsigned.
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        # APPLE_ID / APPLE_TEAM_ID / APPLE_PASSWORD come from job env (empty → unsigned).
         run: npm run tauri:build
 
       - name: Locate DMG, checksum, stabilize filename
