@@ -81,7 +81,8 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          STABLE_NAME="Agent Scope_${VERSION}_aarch64.dmg"
+          # No spaces: GitHub Release rewrites spaces in asset names to dots.
+          STABLE_NAME="Agent.Scope_${VERSION}_aarch64.dmg"
           BUNDLE_DMG_DIR="src-tauri/target/release/bundle/dmg"
 
           echo "Looking for DMG under ${BUNDLE_DMG_DIR} (and bundle/)..."
@@ -128,7 +129,7 @@ jobs:
           body: |
             macOS Apple Silicon (aarch64) DMG.
 
-            **Asset:** `Agent Scope_${{ steps.dmg.outputs.version }}_aarch64.dmg`
+            **Asset:** `Agent.Scope_${{ steps.dmg.outputs.version }}_aarch64.dmg`
             **sha256:** `${{ steps.dmg.outputs.sha256 }}`
 
             Homebrew: after updating the tap cask `sha256` / `version`, users can:

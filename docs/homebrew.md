@@ -26,10 +26,11 @@ homebrew-agent-scope/
 После нового релиза приложения:
 
 1. Создай тег `vX.Y.Z` в `agent-scope` и дождись GitHub Release с DMG.
-2. Имя артефакта (aarch64): `Agent Scope_X.Y.Z_aarch64.dmg` (пробел в имени; в URL — `Agent%20Scope_...`).
+2. Имя артефакта на GitHub Release (aarch64): `Agent.Scope_X.Y.Z_aarch64.dmg`
+   (локально Tauri может собрать `Agent Scope_…` с пробелом; workflow публикует имя без пробелов — GitHub всё равно заменяет пробелы на точки).
 3. Посчитай sha256 артефакта, например:
    ```bash
-   shasum -a 256 "Agent Scope_X.Y.Z_aarch64.dmg"
+   shasum -a 256 "Agent.Scope_X.Y.Z_aarch64.dmg"
    ```
 4. В `NejaTive/homebrew-agent-scope` обнови `Casks/agent-scope.rb`:
    - `version` → `X.Y.Z`
@@ -43,7 +44,7 @@ homebrew-agent-scope/
 
 URL в cask (форма):
 
-`https://github.com/NejaTive/agent-scope/releases/download/v#{version}/Agent%20Scope_#{version}_aarch64.dmg`
+`https://github.com/NejaTive/agent-scope/releases/download/v#{version}/Agent.Scope_#{version}_aarch64.dmg`
 
 ## Gatekeeper / нотаризация
 
