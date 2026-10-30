@@ -20,6 +20,7 @@ const items = computed<BrowserItem[]>(() =>
     projectPath: h.projectPath,
     artifactId: h.sourcePath,
     kind: "hook",
+    product: h.product,
     searchText: [h.event, h.matcher, h.hookType, h.command, h.prompt].filter(Boolean).join(" "),
   })),
 );

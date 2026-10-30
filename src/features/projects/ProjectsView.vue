@@ -72,7 +72,7 @@ async function removeRoot(path: string) {
         <h2 class="label mb-2">Корни сканирования ({{ scan.scanRoots.length }})</h2>
         <div v-if="!scan.scanRoots.length" class="card px-3 py-2 text-xs text-muted">
           Нет корней сканирования. Добавьте папку (например <span class="font-mono">~/Projects</span>), чтобы автоматически находить проекты
-          с конфигурацией Claude.
+          с <span class="font-mono">.claude</span> или <span class="font-mono">.cursor</span>.
         </div>
         <ul v-else class="card divide-y divide-line">
           <li v-for="r in scan.scanRoots" :key="r.path" class="flex items-center gap-2 px-3 py-1.5">
@@ -101,7 +101,7 @@ async function removeRoot(path: string) {
             :description="
               scan.projects.length
                 ? 'Очистите поиск, чтобы увидеть все проекты.'
-                : 'Добавьте папку проекта или корень сканирования, чтобы начать просмотр проектной конфигурации Claude.'
+                : 'Добавьте папку проекта или корень сканирования, чтобы начать просмотр конфигурации Claude Code и Cursor.'
             "
           />
         </div>
@@ -112,9 +112,12 @@ async function removeRoot(path: string) {
                 <span class="truncate text-[13px] font-medium">{{ p.name }}</span>
                 <Badge v-if="p.pinned" tone="accent">закреплён</Badge>
                 <Badge v-if="p.discovered && !p.pinned">обнаружен</Badge>
-                <Badge v-if="!p.hasClaudeDir">нет .claude</Badge>
+                <Badge v-if="p.hasClaudeDir" mono tone="info">.claude</Badge>
+                <Badge v-if="p.hasCursorDir" mono tone="accent">.cursor</Badge>
+                <Badge v-if="!p.hasClaudeDir && !p.hasCursorDir">нет .claude / .cursor</Badge>
                 <Badge v-if="p.hasClaudeMd" mono>CLAUDE.md</Badge>
                 <Badge v-if="p.hasMcpJson" mono>.mcp.json</Badge>
+                <Badge v-if="p.hasCursorMcpJson" mono>.cursor/mcp.json</Badge>
               </span>
               <span class="truncate font-mono text-2xs text-subtle" :title="p.path">{{ shortenPath(p.path) }}</span>
             </button>

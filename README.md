@@ -1,21 +1,23 @@
 # Agent Scope
 
-Локальное macOS-приложение для **просмотра и анализа** конфигурации Claude Code — глобальной и проектной областей — без изменения файлов.
+Локальное macOS-приложение для **просмотра и анализа** конфигурации Claude Code и Cursor — глобальной и проектной областей — без изменения файлов.
+
+**v0.2** — поддержка Cursor (наряду с Claude Code).
 
 Стек: **Tauri 2**, **Rust**, **Vue 3**, TypeScript, Tailwind.
 
 ## Что делает
 
-- Сканирует `~/.claude` (или `CLAUDE_CONFIG_DIR`) и управляемые пути macOS
+- Сканирует `~/.claude` (или `CLAUDE_CONFIG_DIR`), `~/.cursor` и управляемые пути macOS
 - Находит проекты в выбранных корнях (или добавляет проект вручную)
-- Показывает Skills, Commands, Rules, Agents, Hooks, MCP, Plugins, Settings, Memory
+- Показывает Skills, Commands, Rules, Agents, Hooks, MCP, Plugins, Settings, Memory (`AGENTS.md`, `SKILL.md` и др.)
 - Показывает эффективную конфигурацию с явной уверенностью (`computed` / `inferred` / `unknown`)
 - Обнаруживает конфликты (дубли имён, расхождения MCP, переопределения настроек)
 - Отслеживает файлы конфигурации и показывает недавние изменения
 
 ## Чего не делает
 
-- Не создаёт, не редактирует и не удаляет конфигурацию Claude Code (UI только для чтения)
+- Не создаёт, не редактирует и не удаляет конфигурацию Claude Code или Cursor (UI только для чтения)
 - Не запускает хуки, MCP-серверы и shell-команды из конфигов
 - По умолчанию не показывает содержимое credential-файлов и незамаскированные секреты
 
@@ -65,11 +67,12 @@ SQLite (предпочтения / корни сканирования / ист�
 
 `~/Library/Application Support/com.agentscope.desktop/agent-scope.sqlite`
 
-Конфиги Claude остаются в исходных файлах.
+Конфиги Claude Code и Cursor остаются в исходных файлах.
 
 ## Спецификация
 
-См. [docs/spec/claude-code.md](docs/spec/claude-code.md).
+- [docs/spec/claude-code.md](docs/spec/claude-code.md) — карта конфигурации Claude Code
+- [docs/spec/cursor.md](docs/spec/cursor.md) — карта конфигурации Cursor
 
 ## Лицензия
 

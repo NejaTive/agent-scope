@@ -116,6 +116,7 @@ fn empty_global() -> GlobalBundle {
         config_dir: "/c".into(),
         managed_dir: "/m".into(),
         claude_json_path: "/j".into(),
+        cursor_config_dir: Some("/.cursor".into()),
         credentials_present: false,
         items: Collection::default(),
     }

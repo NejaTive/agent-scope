@@ -65,7 +65,10 @@ const status = computed(() => {
       >
         <Icon name="eye" :size="13" />
       </div>
-      <span class="text-[13px] font-semibold tracking-tight">Agent Scope</span>
+      <div class="min-w-0">
+        <div class="text-[13px] font-semibold tracking-tight">Agent Scope</div>
+        <div class="truncate text-2xs text-subtle">Claude Code · Cursor</div>
+      </div>
     </div>
 
     <nav class="flex-1 space-y-px overflow-y-auto px-2 pb-2" aria-label="Разделы">
@@ -115,7 +118,7 @@ const status = computed(() => {
           <span class="truncate">{{ status.text }}</span>
         </span>
         <RouterLink to="/app-settings" class="font-mono hover:text-fg" title="Настройки приложения">
-          v{{ scan.appInfo?.version ?? "0.1.0" }}
+          v{{ scan.appInfo?.version ?? "0.2.0" }}
         </RouterLink>
       </div>
     </div>

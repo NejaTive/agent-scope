@@ -46,6 +46,7 @@ const items = computed<BrowserItem[]>(() =>
     projectPath: e.projectPath,
     artifactId: e.artifactId,
     kind: e.kind,
+    product: e.product,
     searchText: [fm(e, "argument-hint"), fm(e, "model"), fm(e, "allowed-tools"), ...e.files]
       .filter(Boolean)
       .join(" "),
@@ -58,7 +59,7 @@ const items = computed<BrowserItem[]>(() =>
     :items="items"
     :loading="!scan.initialized"
     :empty-title="tab === 'skill' ? 'Скиллы не найдены' : 'Команды не найдены'"
-    empty-description="Скиллы лежат в .claude/skills/<name>/SKILL.md; команды — в .claude/commands/. Запустите сканирование после добавления корней проектов."
+    empty-description="Скиллы лежат в .claude/skills/<name>/SKILL.md и .cursor/skills/<name>/SKILL.md; команды — в .claude/commands/. Запустите сканирование после добавления корней проектов."
   >
     <template #header>
       <div class="flex shrink-0 items-center gap-0.5 border-b border-line px-2 py-1.5" role="tablist">

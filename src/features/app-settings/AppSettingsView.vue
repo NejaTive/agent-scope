@@ -55,8 +55,8 @@ const THEMES: Array<{ value: ThemePreference; label: string }> = [
             <div>
               <div class="text-[13px] font-medium">Отслеживать изменения файлов при запуске</div>
               <div class="text-xs text-muted">
-                Автоматическое мягкое обновление при изменении конфигурации Claude на диске. Переключение сразу запускает или останавливает
-                наблюдатель.
+                Автоматическое мягкое обновление при изменении конфигурации Claude Code и Cursor на диске. Переключение сразу запускает или
+                останавливает наблюдатель.
               </div>
             </div>
             <input
@@ -69,7 +69,7 @@ const THEMES: Array<{ value: ThemePreference; label: string }> = [
           <label class="flex cursor-pointer items-center justify-between gap-4 px-3 py-2.5">
             <div>
               <div class="text-[13px] font-medium">Уведомления</div>
-              <div class="text-xs text-muted">Уведомлять об изменении конфигурации Claude на диске.</div>
+              <div class="text-xs text-muted">Уведомлять об изменении конфигурации Claude Code и Cursor на диске.</div>
             </div>
             <input
               type="checkbox"
@@ -99,10 +99,14 @@ const THEMES: Array<{ value: ThemePreference; label: string }> = [
           <dt class="text-subtle">Название</dt>
           <dd>{{ scan.appInfo?.name ?? "Agent Scope" }}</dd>
           <dt class="text-subtle">Версия</dt>
-          <dd class="font-mono">{{ scan.appInfo?.version ?? "0.1.0" }}</dd>
+          <dd class="font-mono">{{ scan.appInfo?.version ?? "0.2.0" }}</dd>
           <template v-if="scan.globalMeta.configDir">
-            <dt class="text-subtle">Каталог Claude</dt>
+            <dt class="text-subtle">Каталог Claude Code</dt>
             <dd class="break-all font-mono">{{ shortenPath(scan.globalMeta.configDir) }}</dd>
+          </template>
+          <template v-if="scan.globalMeta.cursorConfigDir">
+            <dt class="text-subtle">Каталог Cursor</dt>
+            <dd class="break-all font-mono">{{ shortenPath(scan.globalMeta.cursorConfigDir) }}</dd>
           </template>
           <template v-if="scan.globalMeta.managedDir">
             <dt class="text-subtle">Управляемый каталог</dt>
@@ -116,7 +120,8 @@ const THEMES: Array<{ value: ThemePreference; label: string }> = [
           </dd>
         </dl>
         <p class="mt-2 flex items-center gap-1.5 text-2xs text-subtle">
-          <Icon name="lock" :size="11" /> Agent Scope только для чтения: не создаёт, не изменяет и не удаляет конфигурацию Claude.
+          <Icon name="lock" :size="11" />
+          Agent Scope только для чтения: не создаёт, не изменяет и не удаляет конфигурацию Claude Code или Cursor.
         </p>
       </section>
     </div>

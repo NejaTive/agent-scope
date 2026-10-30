@@ -2,9 +2,11 @@ import type {
   ArtifactKind,
   ConfigArtifact,
   DiscoveryStatus,
+  Product,
   Scope,
   Timestamp,
 } from "@/types/config";
+import { resolveProduct } from "@/lib/labels";
 
 /** Normalised row used by ArtifactBrowser / ArtifactDetail across all feature views. */
 export interface BrowserItem {
@@ -23,6 +25,8 @@ export interface BrowserItem {
   artifactId?: string | null;
   /** Artifact kind (drives the optional kind filter + badge). */
   kind?: ArtifactKind | string;
+  /** Claude Code vs Cursor; missing → treated as Claude Code. */
+  product?: Product | null;
   /** Extra searchable text. */
   searchText?: string;
 }
@@ -39,6 +43,7 @@ export function artifactToItem(a: ConfigArtifact): BrowserItem {
     projectPath: a.projectPath ?? null,
     artifactId: a.path,
     kind: a.kind,
+    product: resolveProduct(a.product),
   };
 }
 

@@ -101,6 +101,24 @@ pub enum Confidence {
     Unknown,
 }
 
+/// Which product/tooling an artifact belongs to (Claude Code vs Cursor).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum Tooling {
+    #[default]
+    Claude,
+    Cursor,
+}
+
+impl Tooling {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Tooling::Claude => "claude",
+            Tooling::Cursor => "cursor",
+        }
+    }
+}
+
 fn short_hash(input: &str) -> String {
     let mut h = Sha256::new();
     h.update(input.as_bytes());
@@ -124,6 +142,9 @@ pub struct ConfigArtifact {
     /// File tree listing (relative paths) for directory-like artifacts such as skills.
     pub children: Vec<String>,
     pub metadata: Value,
+    /// Claude Code vs Cursor; defaults to Claude for existing collectors.
+    #[serde(default)]
+    pub product: Tooling,
 }
 
 impl ConfigArtifact {
@@ -133,6 +154,17 @@ impl ConfigArtifact {
         name: impl Into<String>,
         path: impl Into<String>,
         project_path: Option<String>,
+    ) -> Self {
+        Self::new_with_product(kind, scope, name, path, project_path, Tooling::Claude)
+    }
+
+    pub fn new_with_product(
+        kind: ArtifactKind,
+        scope: Scope,
+        name: impl Into<String>,
+        path: impl Into<String>,
+        project_path: Option<String>,
+        product: Tooling,
     ) -> Self {
         let name = name.into();
         let path = path.into();
@@ -158,6 +190,7 @@ impl ConfigArtifact {
             error: None,
             children: Vec::new(),
             metadata: Value::Null,
+            product,
         }
     }
 }
@@ -170,6 +203,10 @@ pub struct ProjectInfo {
     pub has_claude_dir: bool,
     pub has_claude_md: bool,
     pub has_mcp_json: bool,
+    #[serde(default)]
+    pub has_cursor_dir: bool,
+    #[serde(default)]
+    pub has_cursor_mcp_json: bool,
     pub pinned: bool,
     pub discovered: bool,
     pub artifact_count: usize,
@@ -294,6 +331,9 @@ pub struct GlobalBundle {
     pub config_dir: String,
     pub managed_dir: String,
     pub claude_json_path: String,
+    /// User Cursor config root (`~/.cursor`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor_config_dir: Option<String>,
     /// `.credentials.json` exists (contents are never read).
     pub credentials_present: bool,
     #[serde(flatten)]
@@ -501,6 +541,8 @@ mod tests {
         assert_eq!(serde_json::to_value(Scope::ProjectLocal).unwrap(), "projectLocal");
         assert_eq!(serde_json::to_value(ArtifactKind::ClaudeMd).unwrap(), "claudeMd");
         assert_eq!(serde_json::to_value(DiscoveryStatus::InvalidJson).unwrap(), "invalidJson");
+        assert_eq!(serde_json::to_value(Tooling::Claude).unwrap(), "claude");
+        assert_eq!(serde_json::to_value(Tooling::Cursor).unwrap(), "cursor");
     }
 
     #[test]
@@ -509,5 +551,20 @@ mod tests {
         let v = serde_json::to_value(&a).unwrap();
         assert!(v.get("projectPath").is_some());
         assert!(v.get("sizeBytes").is_some());
+        assert_eq!(v.get("product").unwrap(), "claude");
+    }
+
+    #[test]
+    fn artifact_new_with_product_cursor() {
+        let a = ConfigArtifact::new_with_product(
+            ArtifactKind::McpServer,
+            Scope::User,
+            "mcp",
+            "/.cursor/mcp.json",
+            None,
+            Tooling::Cursor,
+        );
+        assert_eq!(a.product, Tooling::Cursor);
+        assert_eq!(serde_json::to_value(&a).unwrap().get("product").unwrap(), "cursor");
     }
 }

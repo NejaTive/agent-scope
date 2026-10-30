@@ -20,6 +20,7 @@ const items = computed<BrowserItem[]>(() =>
     projectPath: r.projectPath,
     artifactId: r.artifactId,
     kind: "rule",
+    product: r.product,
     searchText: (r.paths ?? []).join(" "),
   })),
 );
@@ -30,7 +31,7 @@ const items = computed<BrowserItem[]>(() =>
     :items="items"
     :loading="!scan.initialized"
     empty-title="Правила не найдены"
-    empty-description="Правила лежат в .claude/rules/*.md на уровне пользователя или проекта."
+    empty-description="Правила лежат в .claude/rules/*.md и .cursor/rules/*.mdc на уровне пользователя или проекта."
   >
     <template #detail="{ item }">
       <FieldList

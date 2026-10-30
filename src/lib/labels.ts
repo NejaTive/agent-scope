@@ -2,8 +2,28 @@ import type {
   ArtifactKind,
   Confidence,
   DiscoveryStatus,
+  Product,
   Scope,
 } from "@/types/config";
+
+/** Display names — brand strings must stay untranslated. */
+export const PRODUCT_LABEL: Record<Product, string> = {
+  claude: "Claude Code",
+  cursor: "Cursor",
+};
+
+export const PRODUCT_ORDER: Product[] = ["claude", "cursor"];
+
+/** Dir badge text (filesystem names, not translated). */
+export const PRODUCT_DIR_LABEL: Record<Product, string> = {
+  claude: ".claude",
+  cursor: ".cursor",
+};
+
+/** Missing / null product → Claude Code for backward compatibility. */
+export function resolveProduct(product?: Product | null): Product {
+  return product === "cursor" ? "cursor" : "claude";
+}
 
 export const SCOPE_LABEL: Record<Scope, string> = {
   managed: "Управляемый",

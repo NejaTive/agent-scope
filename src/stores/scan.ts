@@ -5,6 +5,7 @@ import {
   emptySnapshot,
   errMsg,
   isProjectScope,
+  normalizeProjectInfo,
   normalizeScanRoots,
   normalizeSnapshot,
 } from "@/lib/normalize";
@@ -95,7 +96,9 @@ export const useScanStore = defineStore("scan", () => {
     const [info, roots, projs, dash, changes, conf] = results;
     if (info.status === "fulfilled") appInfo.value = info.value;
     if (roots.status === "fulfilled") scanRoots.value = normalizeScanRoots(roots.value);
-    if (projs.status === "fulfilled" && Array.isArray(projs.value)) projectsList.value = projs.value;
+    if (projs.status === "fulfilled" && Array.isArray(projs.value)) {
+      projectsList.value = projs.value.map(normalizeProjectInfo);
+    }
     if (dash.status === "fulfilled") dashboardRaw.value = dash.value;
     if (changes.status === "fulfilled" && Array.isArray(changes.value))
       recentChanges.value = changes.value;

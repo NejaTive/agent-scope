@@ -9,6 +9,7 @@ import type { BrowserItem } from "@/lib/browser";
 import type { ViewContent } from "@/types/config";
 import { useScanStore } from "@/stores/scan";
 import Badge from "./Badge.vue";
+import ProductBadge from "./ProductBadge.vue";
 import ScopeBadge from "./ScopeBadge.vue";
 import LoadingBlock from "./LoadingBlock.vue";
 import EmptyState from "./EmptyState.vue";
@@ -88,9 +89,13 @@ const status = computed(() => props.item.status ?? "present");
       <div class="flex flex-wrap items-center gap-2">
         <h2 class="min-w-0 break-words text-sm font-semibold">{{ item.name }}</h2>
         <Badge v-if="kindLabel">{{ kindLabel }}</Badge>
+        <ProductBadge :product="item.product" />
         <ScopeBadge :scope="item.scope" />
         <Badge :tone="STATUS_TONE[status]">{{ STATUS_LABEL[status] }}</Badge>
-        <span class="ml-auto flex items-center gap-1 text-2xs text-subtle" title="Это приложение никогда не изменяет конфигурацию Claude">
+        <span
+          class="ml-auto flex items-center gap-1 text-2xs text-subtle"
+          title="Это приложение никогда не изменяет конфигурацию Claude Code или Cursor"
+        >
           <Icon name="lock" :size="11" /> только чтение
         </span>
       </div>

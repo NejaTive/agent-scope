@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { useScanStore } from "@/stores/scan";
 import { useUiStore } from "@/stores/ui";
 import { formatTime, relativeTime, shortenPath } from "@/lib/format";
+import { PRODUCT_LABEL, resolveProduct } from "@/lib/labels";
 import Badge from "@/components/common/Badge.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import ScopeBadge from "@/components/common/ScopeBadge.vue";
@@ -13,6 +14,18 @@ const ui = useUiStore();
 const router = useRouter();
 
 onMounted(() => ui.markChangesSeen());
+
+const productStats = computed(() => {
+  let claude = 0;
+  let cursor = 0;
+  for (const a of scan.artifacts) {
+    if (resolveProduct(a.product) === "cursor") cursor += 1;
+    else claude += 1;
+  }
+  const withClaude = scan.projects.filter((p) => p.hasClaudeDir).length;
+  const withCursor = scan.projects.filter((p) => p.hasCursorDir).length;
+  return { claude, cursor, withClaude, withCursor };
+});
 
 const cards = computed(() => {
   const d = scan.dashboard;
@@ -52,6 +65,20 @@ const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
 <template>
   <div class="h-full overflow-y-auto">
     <div class="mx-auto max-w-5xl space-y-6 px-6 py-5">
+      <section class="flex flex-wrap items-center gap-2 text-xs text-muted">
+        <Badge tone="info">{{ PRODUCT_LABEL.claude }}</Badge>
+        <span>
+          {{ productStats.claude }} артефактов · {{ productStats.withClaude }} проектов с
+          <span class="font-mono">.claude</span>
+        </span>
+        <span class="text-subtle">·</span>
+        <Badge tone="accent">{{ PRODUCT_LABEL.cursor }}</Badge>
+        <span>
+          {{ productStats.cursor }} артефактов · {{ productStats.withCursor }} проектов с
+          <span class="font-mono">.cursor</span>
+        </span>
+      </section>
+
       <section>
         <div class="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-5">
           <button
@@ -116,7 +143,7 @@ const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
             compact
             icon="activity"
             title="Нет недавних изменений"
-            description="Изменения файлов в отслеживаемых каталогах конфигурации Claude появятся здесь."
+            description="Изменения файлов в отслеживаемых каталогах Claude Code и Cursor появятся здесь."
           />
         </div>
         <ul v-else class="card divide-y divide-line">

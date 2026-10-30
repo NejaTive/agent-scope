@@ -10,18 +10,34 @@ pub fn canonical(p: &Path) -> PathBuf {
     dunce::canonicalize(p).unwrap_or_else(|_| p.to_path_buf())
 }
 
-/// Describe `dir` as a project if it has `.claude/`, `CLAUDE.md` or `.mcp.json`.
+/// Describe `dir` as a project if it has Claude or Cursor markers.
 pub fn probe_project(dir: &Path) -> Option<ProjectInfo> {
     let has_claude_dir = dir.join(".claude").is_dir();
     let has_claude_md = dir.join("CLAUDE.md").is_file();
     let has_mcp_json = dir.join(".mcp.json").is_file();
-    if !(has_claude_dir || has_claude_md || has_mcp_json) {
+    let has_cursor_dir = dir.join(".cursor").is_dir();
+    let has_cursor_mcp_json = dir.join(".cursor/mcp.json").is_file();
+    if !(has_claude_dir || has_claude_md || has_mcp_json || has_cursor_dir || has_cursor_mcp_json) {
         return None;
     }
-    Some(project_info(dir, has_claude_dir, has_claude_md, has_mcp_json))
+    Some(project_info(
+        dir,
+        has_claude_dir,
+        has_claude_md,
+        has_mcp_json,
+        has_cursor_dir,
+        has_cursor_mcp_json,
+    ))
 }
 
-pub fn project_info(dir: &Path, has_claude_dir: bool, has_claude_md: bool, has_mcp_json: bool) -> ProjectInfo {
+pub fn project_info(
+    dir: &Path,
+    has_claude_dir: bool,
+    has_claude_md: bool,
+    has_mcp_json: bool,
+    has_cursor_dir: bool,
+    has_cursor_mcp_json: bool,
+) -> ProjectInfo {
     ProjectInfo {
         path: dir.to_string_lossy().to_string(),
         name: dir
@@ -31,6 +47,8 @@ pub fn project_info(dir: &Path, has_claude_dir: bool, has_claude_md: bool, has_m
         has_claude_dir,
         has_claude_md,
         has_mcp_json,
+        has_cursor_dir,
+        has_cursor_mcp_json,
         pinned: false,
         discovered: true,
         artifact_count: 0,
@@ -44,6 +62,8 @@ pub fn info_for_dir(dir: &Path) -> ProjectInfo {
         dir.join(".claude").is_dir(),
         dir.join("CLAUDE.md").is_file(),
         dir.join(".mcp.json").is_file(),
+        dir.join(".cursor").is_dir(),
+        dir.join(".cursor/mcp.json").is_file(),
     )
 }
 
@@ -133,6 +153,39 @@ mod tests {
         let names: Vec<_> = found.iter().map(|p| p.name.clone()).collect();
         assert_eq!(names, vec!["a", "b", "c"]);
         assert!(found[0].has_claude_dir && found[1].has_claude_md && found[2].has_mcp_json);
+    }
+
+    #[test]
+    fn discovers_cursor_only_project() {
+        let d = tempdir().unwrap();
+        let r = d.path();
+        mk(&r.join("cursor-only/.cursor"));
+        fs::write(r.join("cursor-only/.cursor/mcp.json"), "{}").unwrap();
+        mk(&r.join("cursor-mcp"));
+        // `.cursor/mcp.json` without a `.cursor` dir still counts via parent create
+        fs::create_dir_all(r.join("cursor-mcp/.cursor")).unwrap();
+        fs::write(r.join("cursor-mcp/.cursor/mcp.json"), "{}").unwrap();
+        // Only a nested mcp under a sibling should not invent extra projects
+        mk(&r.join("plain/src"));
+
+        let found = discover_projects(&[r.to_path_buf()], 4);
+        let names: Vec<_> = found.iter().map(|p| p.name.clone()).collect();
+        assert_eq!(names, vec!["cursor-mcp", "cursor-only"]);
+        assert!(found.iter().all(|p| p.has_cursor_dir && p.has_cursor_mcp_json));
+        assert!(found.iter().all(|p| !p.has_claude_dir && !p.has_claude_md && !p.has_mcp_json));
+    }
+
+    #[test]
+    fn probe_project_with_only_cursor_dir() {
+        let d = tempdir().unwrap();
+        let proj = d.path().join("p");
+        mk(&proj.join(".cursor"));
+        let info = probe_project(&proj).expect("cursor dir should mark a project");
+        assert!(info.has_cursor_dir);
+        assert!(!info.has_cursor_mcp_json);
+        assert!(!info.has_claude_dir);
+        assert!(!info.has_claude_md);
+        assert!(!info.has_mcp_json);
     }
 
     #[test]

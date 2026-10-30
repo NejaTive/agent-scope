@@ -1,6 +1,7 @@
-//! Read-only scanner for global and per-project Claude Code configuration.
+//! Read-only scanner for global and per-project Claude Code / Cursor configuration.
 
 pub mod collect;
+pub mod cursor;
 pub mod discovery;
 pub mod hooks;
 pub mod plugins;
@@ -93,7 +94,7 @@ pub fn scan_global_with(ctx: &ScanContext) -> GlobalBundle {
     collect_claude_md(&mut c, &paths.managed_dir.join("CLAUDE.md"), Scope::Managed, None, false);
     collect_mcp_json(&mut c, &paths.managed_dir.join("managed-mcp.json"), Scope::Managed, None, "managed-mcp.json");
 
-    // User scope
+    // User scope (Claude)
     collect_settings_file(&mut c, &paths.config_dir.join("settings.json"), Scope::User, None, true);
     collect_claude_md(&mut c, &paths.config_dir.join("CLAUDE.md"), Scope::User, None, true);
     collect_claude_dir(&mut c, &paths.config_dir, Scope::User, None);
@@ -105,6 +106,9 @@ pub fn scan_global_with(ctx: &ScanContext) -> GlobalBundle {
     } else {
         false
     };
+
+    // User scope (Cursor) — after Claude so `.claude/**` paths stay Claude-owned.
+    cursor::collect_cursor_user(&mut c, paths);
 
     // ~/.claude.json: top-level (user-scope) MCP servers only. The `projects` map is
     // attributed to each project's own bundle.
@@ -149,6 +153,7 @@ pub fn scan_global_with(ctx: &ScanContext) -> GlobalBundle {
         config_dir: path_str(&paths.config_dir),
         managed_dir: path_str(&paths.managed_dir),
         claude_json_path: path_str(&paths.claude_json),
+        cursor_config_dir: Some(path_str(&paths.cursor_dir)),
         credentials_present,
         items: c,
     }
@@ -189,6 +194,9 @@ pub fn scan_project_with(ctx: &ScanContext, root: &Path) -> ProjectBundle {
 
     collect_claude_dir(&mut c, &claude, Scope::Project, p);
     collect_nested_memory_files(&mut c, &root, p);
+
+    // Cursor project paths — skip anything Claude already collected (one path = one artifact).
+    cursor::collect_cursor_project(&mut c, &root, p);
 
     let mut info = discovery::info_for_dir(&root);
     info.artifact_count = c.artifacts.iter().filter(|a| a.status != DiscoveryStatus::Missing).count();

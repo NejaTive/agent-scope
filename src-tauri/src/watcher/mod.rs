@@ -57,13 +57,35 @@ pub fn is_relevant(path: &Path, paths: &Paths, project_roots: &[PathBuf]) -> boo
     if path.starts_with(&paths.managed_dir) {
         return true;
     }
+    if path == paths.cursor_hooks_json || path == paths.cursor_mcp_json || path == paths.cursor_managed_hooks {
+        return true;
+    }
+    if let Ok(rel) = path.strip_prefix(&paths.cursor_dir) {
+        let comps: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
+        return matches!(
+            comps.first().map(|s| s.as_str()),
+            Some("rules") | Some("skills") | Some("commands") | Some("agents") | Some("hooks")
+                | Some("hooks.json") | Some("mcp.json")
+        );
+    }
+    // User-level `~/.agents/skills`
+    if let Ok(rel) = path.strip_prefix(&paths.home.join(".agents")) {
+        let comps: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
+        if comps.first().map(|s| s.as_str()) == Some("skills") {
+            return true;
+        }
+    }
     for root in project_roots {
         if let Ok(rel) = path.strip_prefix(root) {
-            let first = rel.components().next().map(|c| c.as_os_str().to_string_lossy().to_string());
-            if first.as_deref() == Some(".claude") {
+            let comps: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
+            let first = comps.first().map(|s| s.as_str());
+            if first == Some(".claude") || first == Some(".cursor") {
                 return true;
             }
-            if rel.components().count() == 1 && PROJECT_FILE_NAMES.contains(&name.as_str()) {
+            if first == Some(".agents") && comps.get(1).map(|s| s.as_str()) == Some("skills") {
+                return true;
+            }
+            if comps.len() == 1 && PROJECT_FILE_NAMES.contains(&name.as_str()) {
                 return true;
             }
         }
@@ -89,9 +111,20 @@ pub fn watch_targets(paths: &Paths, project_roots: &[PathBuf]) -> Vec<(PathBuf, 
         push(parent.to_path_buf(), RecursiveMode::NonRecursive);
     }
     push(paths.managed_dir.clone(), RecursiveMode::NonRecursive);
+    // Cursor user config
+    push(paths.cursor_dir.clone(), RecursiveMode::NonRecursive);
+    for sub in ["rules", "skills", "commands", "agents", "hooks"] {
+        push(paths.cursor_dir.join(sub), RecursiveMode::Recursive);
+    }
+    push(paths.home.join(".agents/skills"), RecursiveMode::Recursive);
+    if let Some(parent) = paths.cursor_managed_hooks.parent() {
+        push(parent.to_path_buf(), RecursiveMode::NonRecursive);
+    }
     for root in project_roots {
         push(root.clone(), RecursiveMode::NonRecursive);
         push(root.join(".claude"), RecursiveMode::Recursive);
+        push(root.join(".cursor"), RecursiveMode::Recursive);
+        push(root.join(".agents/skills"), RecursiveMode::Recursive);
     }
     v
 }
@@ -150,11 +183,28 @@ fn canonical_paths(p: &Paths) -> Paths {
         (Some(parent), Some(name)) => canon(parent).join(name),
         _ => p.claude_json.clone(),
     };
+    let cursor_dir = canon(&p.cursor_dir);
+    let cursor_mcp_json = match (p.cursor_mcp_json.parent(), p.cursor_mcp_json.file_name()) {
+        (Some(parent), Some(name)) => canon(parent).join(name),
+        _ => p.cursor_mcp_json.clone(),
+    };
+    let cursor_hooks_json = match (p.cursor_hooks_json.parent(), p.cursor_hooks_json.file_name()) {
+        (Some(parent), Some(name)) => canon(parent).join(name),
+        _ => p.cursor_hooks_json.clone(),
+    };
+    let cursor_managed_hooks = match (p.cursor_managed_hooks.parent(), p.cursor_managed_hooks.file_name()) {
+        (Some(parent), Some(name)) => canon(parent).join(name),
+        _ => p.cursor_managed_hooks.clone(),
+    };
     Paths {
         home: canon(&p.home),
         config_dir: canon(&p.config_dir),
         claude_json,
         managed_dir: canon(&p.managed_dir),
+        cursor_dir,
+        cursor_mcp_json,
+        cursor_hooks_json,
+        cursor_managed_hooks,
     }
 }
 
@@ -257,6 +307,13 @@ mod tests {
         assert!(!is_relevant(&proj.join("src/main.rs"), &paths, &roots));
         assert!(!is_relevant(&proj.join(".claude/node_modules/x"), &paths, &roots));
         assert!(!is_relevant(&d.path().join("random.txt"), &paths, &roots));
+        // Cursor
+        assert!(is_relevant(&paths.cursor_dir.join("rules/a.mdc"), &paths, &roots));
+        assert!(is_relevant(&paths.cursor_mcp_json, &paths, &roots));
+        assert!(is_relevant(&paths.cursor_hooks_json, &paths, &roots));
+        assert!(is_relevant(&proj.join(".cursor/skills/x/SKILL.md"), &paths, &roots));
+        assert!(is_relevant(&proj.join(".agents/skills/y/SKILL.md"), &paths, &roots));
+        assert!(!is_relevant(&paths.cursor_dir.join("secrets.txt"), &paths, &roots));
     }
 
     #[test]
@@ -264,12 +321,16 @@ mod tests {
         let d = tempdir().unwrap();
         let paths = Paths::for_root(d.path());
         std::fs::create_dir_all(paths.config_dir.join("rules")).unwrap();
+        std::fs::create_dir_all(paths.cursor_dir.join("skills")).unwrap();
         let proj = d.path().join("p");
         std::fs::create_dir_all(proj.join(".claude")).unwrap();
+        std::fs::create_dir_all(proj.join(".cursor")).unwrap();
         let t = watch_targets(&paths, &[proj.clone()]);
         assert!(t.iter().any(|(p, m)| p == &paths.config_dir.join("rules") && *m == RecursiveMode::Recursive));
         assert!(t.iter().any(|(p, _)| p == &proj.join(".claude")));
         assert!(!t.iter().any(|(p, _)| p == &paths.config_dir.join("skills")));
+        assert!(t.iter().any(|(p, m)| p == &paths.cursor_dir.join("skills") && *m == RecursiveMode::Recursive));
+        assert!(t.iter().any(|(p, _)| p == &proj.join(".cursor")));
     }
 
     #[test]

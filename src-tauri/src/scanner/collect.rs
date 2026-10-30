@@ -33,7 +33,7 @@ fn stat(path: &Path) -> (Option<u64>, Option<String>) {
     }
 }
 
-fn artifact(
+pub fn artifact(
     kind: ArtifactKind,
     scope: Scope,
     name: &str,
@@ -47,7 +47,7 @@ fn artifact(
     a
 }
 
-fn report(c: &mut Collection, path: &Path, scope: Scope, status: DiscoveryStatus, msg: &str) {
+pub fn report(c: &mut Collection, path: &Path, scope: Scope, status: DiscoveryStatus, msg: &str) {
     c.errors.push(ScanError {
         path: path_str(path),
         scope: Some(scope),

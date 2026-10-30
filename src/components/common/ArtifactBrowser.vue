@@ -3,13 +3,25 @@ import { computed, ref, toRef, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { useSearch } from "@/composables/useSearch";
 import { useUiStore } from "@/stores/ui";
-import { KIND_LABEL, KIND_PLURAL, SCOPE_LABEL, SCOPE_ORDER, SCOPE_PRECEDENCE, STATUS_LABEL, STATUS_TONE } from "@/lib/labels";
+import {
+  KIND_LABEL,
+  KIND_PLURAL,
+  PRODUCT_LABEL,
+  PRODUCT_ORDER,
+  SCOPE_LABEL,
+  SCOPE_ORDER,
+  SCOPE_PRECEDENCE,
+  STATUS_LABEL,
+  STATUS_TONE,
+  resolveProduct,
+} from "@/lib/labels";
 import { relativeTime, shortenPath } from "@/lib/format";
 import type { BrowserItem } from "@/lib/browser";
-import type { ArtifactKind } from "@/types/config";
+import type { ArtifactKind, Product } from "@/types/config";
 import ArtifactDetail from "./ArtifactDetail.vue";
 import EmptyState from "./EmptyState.vue";
 import LoadingBlock from "./LoadingBlock.vue";
+import ProductBadge from "./ProductBadge.vue";
 import ScopeBadge from "./ScopeBadge.vue";
 import StatusDot from "./StatusDot.vue";
 import Badge from "./Badge.vue";
@@ -24,6 +36,8 @@ const props = withDefaults(
     kindFilter?: boolean;
     /** Show the kind badge on each row. */
     showKind?: boolean;
+    /** Force product badge even when only one product is present. */
+    showProduct?: boolean;
     collapsedContent?: boolean;
     contentLabel?: string;
     listWidth?: number;
@@ -34,6 +48,7 @@ const props = withDefaults(
     emptyDescription: "Подходящие элементы не обнаружены.",
     kindFilter: false,
     showKind: false,
+    showProduct: false,
     collapsedContent: false,
     contentLabel: "Содержимое файла",
     listWidth: 340,
@@ -43,15 +58,37 @@ const props = withDefaults(
 const ui = useUiStore();
 const { focusArtifactId } = storeToRefs(ui);
 
+const product = ref<Product | "all">("all");
 const kind = ref<string>("all");
+
+const productCounts = computed(() => {
+  const m = new Map<Product, number>();
+  for (const i of props.items) {
+    const p = resolveProduct(i.product);
+    m.set(p, (m.get(p) ?? 0) + 1);
+  }
+  return m;
+});
+
+const showProductFilter = computed(() => productCounts.value.size > 1);
+const showProductBadge = computed(() => props.showProduct || showProductFilter.value);
+
+const productScoped = computed(() =>
+  product.value === "all"
+    ? props.items
+    : props.items.filter((i) => resolveProduct(i.product) === product.value),
+);
+
 const kindCounts = computed(() => {
   const m = new Map<string, number>();
-  for (const i of props.items) if (i.kind) m.set(String(i.kind), (m.get(String(i.kind)) ?? 0) + 1);
+  for (const i of productScoped.value) if (i.kind) m.set(String(i.kind), (m.get(String(i.kind)) ?? 0) + 1);
   return m;
 });
 
 const kindScoped = computed(() =>
-  kind.value === "all" ? props.items : props.items.filter((i) => String(i.kind) === kind.value),
+  kind.value === "all"
+    ? productScoped.value
+    : productScoped.value.filter((i) => String(i.kind) === kind.value),
 );
 
 const { scope, availableScopes, filtered } = useSearch(kindScoped, (i) => [
@@ -60,6 +97,7 @@ const { scope, availableScopes, filtered } = useSearch(kindScoped, (i) => [
   i.path,
   i.projectPath,
   i.searchText,
+  PRODUCT_LABEL[resolveProduct(i.product)],
 ]);
 
 const sorted = computed(() =>
@@ -68,6 +106,13 @@ const sorted = computed(() =>
       (SCOPE_PRECEDENCE[b.scope] ?? 0) - (SCOPE_PRECEDENCE[a.scope] ?? 0) ||
       a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
   ),
+);
+
+const productChips = computed(() =>
+  PRODUCT_ORDER.filter((p) => productCounts.value.has(p)).map((p) => ({
+    product: p,
+    count: productCounts.value.get(p) ?? 0,
+  })),
 );
 
 const scopeChips = computed(() =>
@@ -98,6 +143,7 @@ watch(
     if (!id) return;
     const hit = props.items.find((i) => i.id === id || i.artifactId === id);
     if (hit) {
+      product.value = "all";
       kind.value = "all";
       scope.value = "all";
       selectedId.value = hit.id;
@@ -119,6 +165,27 @@ const kindLabel = (k: string) => KIND_PLURAL[k as ArtifactKind] ?? k;
       <slot name="header" />
 
       <div class="shrink-0 space-y-1 border-b border-line px-2 py-1.5">
+        <div v-if="showProductFilter" class="flex flex-wrap gap-0.5">
+          <button
+            type="button"
+            class="chip"
+            :class="product === 'all' && 'chip-active'"
+            @click="product = 'all'"
+          >
+            Все продукты
+          </button>
+          <button
+            v-for="c in productChips"
+            :key="c.product"
+            type="button"
+            class="chip"
+            :class="product === c.product && 'chip-active'"
+            @click="product = c.product"
+          >
+            {{ PRODUCT_LABEL[c.product] }}
+            <span class="font-mono text-2xs text-subtle">{{ c.count }}</span>
+          </button>
+        </div>
         <div v-if="kindFilter && kindCounts.size > 1" class="flex flex-wrap gap-0.5">
           <button
             type="button"
@@ -169,7 +236,7 @@ const kindLabel = (k: string) => KIND_PLURAL[k as ArtifactKind] ?? k;
           v-else-if="!sorted.length"
           compact
           :title="items.length ? 'Нет совпадений' : emptyTitle"
-          :description="items.length ? 'Измените поиск или фильтр области.' : emptyDescription"
+          :description="items.length ? 'Измените поиск или фильтр продукта / области.' : emptyDescription"
         />
         <ul v-else class="py-1" role="listbox">
           <li v-for="item in sorted" :key="item.id" role="option" :aria-selected="item.id === selectedId">
@@ -191,6 +258,7 @@ const kindLabel = (k: string) => KIND_PLURAL[k as ArtifactKind] ?? k;
                 />
                 <span class="min-w-0 flex-1 truncate text-[13px] font-medium">{{ item.name }}</span>
                 <Badge v-if="showKind && item.kind">{{ KIND_LABEL[item.kind as ArtifactKind] ?? item.kind }}</Badge>
+                <ProductBadge v-if="showProductBadge" :product="item.product" />
                 <ScopeBadge :scope="item.scope" />
               </span>
               <span v-if="item.subtitle" class="line-clamp-1 text-xs text-muted">{{ item.subtitle }}</span>

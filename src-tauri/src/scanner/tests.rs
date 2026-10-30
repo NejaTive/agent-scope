@@ -216,3 +216,151 @@ fn claude_json_view_is_redacted() {
     assert!(!out.contains("\"k\"") && !out.contains("\"tv\""));
     assert!(out.contains(MASK));
 }
+
+#[test]
+fn cursor_global_collects_rules_skills_hooks_mcp() {
+    let d = tempdir().unwrap();
+    let paths = Paths::for_root(d.path());
+    let cur = &paths.cursor_dir;
+    w(
+        &cur.join("rules/style.mdc"),
+        "---\ndescription: Style\nalwaysApply: false\nglobs:\n  - \"**/*.ts\"\n---\nUse const\n",
+    );
+    w(&cur.join("rules/always.mdc"), "---\nalwaysApply: true\n---\nAlways\n");
+    w(&cur.join("skills/pdf/SKILL.md"), "---\nname: pdf\ndescription: Make pdfs\n---\nbody");
+    w(
+        &cur.join("skills/nested/group/land/SKILL.md"),
+        "---\nname: land\ndescription: Land it\n---\n",
+    );
+    w(&cur.join("commands/ship.md"), "---\ndescription: Ship it\n---\nrun");
+    w(
+        &cur.join("agents/rev.md"),
+        "---\nname: rev\ndescription: Reviews\ntools: Read\n---\nprompt",
+    );
+    w(
+        &cur.join("hooks.json"),
+        r#"{"version":1,"hooks":{"afterFileEdit":[{"command":".cursor/hooks/format.sh"}]}}"#,
+    );
+    w(
+        &cur.join("mcp.json"),
+        r#"{"mcpServers":{"gh":{"command":"npx","args":["gh"],"env":{"GITHUB_TOKEN":"ghp_SECRET"}}}}"#,
+    );
+    w(
+        &paths.home.join(".agents/skills/agent-skill/SKILL.md"),
+        "---\nname: agent-skill\ndescription: From agents\n---\n",
+    );
+    // Claude skill must stay Claude product and must not be duplicated as Cursor.
+    w(
+        &paths.config_dir.join("skills/shared/SKILL.md"),
+        "---\nname: shared\ndescription: Claude owned\n---\n",
+    );
+
+    let g = scan_global_with(&ScanContext::load(&paths));
+    let c = &g.items;
+
+    let rules: Vec<_> = c.artifacts.iter().filter(|a| a.kind == ArtifactKind::Rule && a.product == Tooling::Cursor).collect();
+    assert_eq!(rules.len(), 2);
+    let styled = c.rules.iter().find(|r| r.name == "style.mdc").unwrap();
+    assert_eq!(styled.paths, vec!["**/*.ts"]);
+    assert!(styled.conditional);
+
+    let cursor_skills: Vec<_> = c
+        .artifacts
+        .iter()
+        .filter(|a| a.kind == ArtifactKind::Skill && a.product == Tooling::Cursor)
+        .collect();
+    assert!(cursor_skills.iter().any(|a| a.name == "pdf"));
+    assert!(cursor_skills.iter().any(|a| a.name == "land"));
+    assert!(cursor_skills.iter().any(|a| a.name == "agent-skill"));
+
+    let shared = find(c, ArtifactKind::Skill, "shared");
+    assert_eq!(shared.product, Tooling::Claude);
+    assert_eq!(
+        c.artifacts.iter().filter(|a| a.path == shared.path).count(),
+        1,
+        "claude skill path must not be re-collected as Cursor"
+    );
+
+    find(c, ArtifactKind::Command, "ship");
+    assert!(c.artifacts.iter().any(|a| a.kind == ArtifactKind::Command && a.product == Tooling::Cursor));
+    assert!(c.agents.iter().any(|a| a.name == "rev"));
+
+    assert!(c.hooks.iter().any(|h| h.event == "afterFileEdit" && h.command.as_deref() == Some(".cursor/hooks/format.sh")));
+    assert!(c.artifacts.iter().any(|a| a.kind == ArtifactKind::Hook && a.product == Tooling::Cursor));
+
+    let mcp = c.mcp_servers.iter().find(|m| m.name == "gh").unwrap();
+    assert_eq!(mcp.config["env"]["GITHUB_TOKEN"], MASK);
+    let dump = serde_json::to_string(&g).unwrap();
+    assert!(!dump.contains("ghp_SECRET"));
+}
+
+#[test]
+fn cursor_project_dedupes_agents_md_and_claude_skills() {
+    let d = tempdir().unwrap();
+    let paths = Paths::for_root(d.path());
+    let proj = d.path().join("work/app");
+    w(&proj.join("AGENTS.md"), "# Agents\nshared instructions");
+    w(&proj.join(".claude/skills/deploy/SKILL.md"), "---\nname: deploy\ndescription: Claude deploy\n---\n");
+    w(&proj.join(".cursor/rules/api.mdc"), "---\ndescription: API\nalwaysApply: true\n---\nrules\n");
+    w(&proj.join(".cursor/skills/ship/SKILL.md"), "---\nname: ship\ndescription: Cursor ship\n---\n");
+    w(&proj.join(".agents/skills/extra/SKILL.md"), "---\nname: extra\ndescription: Extra\n---\n");
+    w(
+        &proj.join(".cursor/mcp.json"),
+        r#"{"mcpServers":{"db":{"type":"http","url":"https://x","headers":{"Authorization":"Bearer tok"}}}}"#,
+    );
+    w(
+        &proj.join(".cursor/hooks.json"),
+        r#"{"version":1,"hooks":{"sessionEnd":[{"command":".cursor/hooks/audit.sh"}]}}"#,
+    );
+
+    let b = scan_project_with(&ScanContext::load(&paths), &proj);
+    let c = &b.items;
+
+    let agents: Vec<_> = c.artifacts.iter().filter(|a| a.name == "AGENTS.md").collect();
+    assert_eq!(agents.len(), 1, "AGENTS.md collected once");
+    assert_eq!(agents[0].product, Tooling::Claude, "Claude collector owns AGENTS.md when present");
+
+    let deploy = find(c, ArtifactKind::Skill, "deploy");
+    assert_eq!(deploy.product, Tooling::Claude);
+    assert_eq!(c.artifacts.iter().filter(|a| a.path == deploy.path).count(), 1);
+
+    let ship = find(c, ArtifactKind::Skill, "ship");
+    assert_eq!(ship.product, Tooling::Cursor);
+    let extra = find(c, ArtifactKind::Skill, "extra");
+    assert_eq!(extra.product, Tooling::Cursor);
+    assert!(c.artifacts.iter().any(|a| a.kind == ArtifactKind::Rule && a.product == Tooling::Cursor && a.name == "api.mdc"));
+
+    let db = c.mcp_servers.iter().find(|m| m.name == "db").unwrap();
+    assert_eq!(db.config["headers"]["Authorization"], MASK);
+    assert!(c.hooks.iter().any(|h| h.event == "sessionEnd"));
+
+    // Unique paths across all artifacts (hook entries may share hooks.json path with Other + Hook kinds —
+    // allow same path for different kinds/ids, but skill/rule file paths must be unique).
+    let mut skill_paths: Vec<_> = c
+        .artifacts
+        .iter()
+        .filter(|a| a.kind == ArtifactKind::Skill)
+        .map(|a| a.path.clone())
+        .collect();
+    skill_paths.sort();
+    let before = skill_paths.len();
+    skill_paths.dedup();
+    assert_eq!(skill_paths.len(), before);
+}
+
+#[test]
+fn cursor_only_project_picks_up_agents_md() {
+    let d = tempdir().unwrap();
+    let paths = Paths::for_root(d.path());
+    let proj = d.path().join("cursor-app");
+    // No CLAUDE.md / .claude — but Claude collector still tries AGENTS.md first.
+    // With Claude collector owning AGENTS.md, product stays Claude when the file exists.
+    // This fixture verifies Cursor still scans .cursor when Claude markers are absent.
+    w(&proj.join("AGENTS.md"), "cursor agents");
+    w(&proj.join(".cursor/rules/r.mdc"), "---\nalwaysApply: true\n---\nx\n");
+
+    let b = scan_project_with(&ScanContext::load(&paths), &proj);
+    assert!(b.items.artifacts.iter().any(|a| a.product == Tooling::Cursor && a.kind == ArtifactKind::Rule));
+    let agents = b.items.artifacts.iter().filter(|a| a.name == "AGENTS.md").count();
+    assert_eq!(agents, 1);
+}

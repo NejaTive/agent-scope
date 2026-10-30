@@ -10,6 +10,7 @@ import type {
   GlobalMeta,
   HookEntry,
   McpServerEntry,
+  Product,
   ProjectInfo,
   RuleEntry,
   ScanRoot,
@@ -24,8 +25,16 @@ import type {
   UiSkill,
   ViewContent,
 } from "@/types/config";
+import { resolveProduct } from "@/lib/labels";
 
 const arr = <T>(v: T[] | undefined | null): T[] => (Array.isArray(v) ? v : []);
+
+function withProduct<T extends { product?: Product | null }>(
+  e: T,
+  fallback?: Product | null,
+): T & { product: Product } {
+  return { ...e, product: resolveProduct(e.product ?? fallback) };
+}
 
 /** Scopes that belong to a project (as opposed to user/managed/plugin/global). */
 const PROJECT_SCOPES: ReadonlySet<Scope> = new Set<Scope>(["project", "projectLocal", "nested"]);
@@ -57,7 +66,28 @@ export function emptyDashboard(): DashboardSummary {
 }
 
 function emptyGlobalMeta(): GlobalMeta {
-  return { configDir: "", managedDir: "", claudeJsonPath: "", credentialsPresent: false };
+  return {
+    configDir: "",
+    managedDir: "",
+    claudeJsonPath: "",
+    cursorConfigDir: null,
+    credentialsPresent: false,
+  };
+}
+
+/** Coerce project flags so missing backend fields (e.g. `hasCursorDir`) stay safe. */
+export function normalizeProjectInfo(p: ProjectInfo): ProjectInfo {
+  return {
+    ...p,
+    hasClaudeDir: !!p.hasClaudeDir,
+    hasCursorDir: !!p.hasCursorDir,
+    hasClaudeMd: !!p.hasClaudeMd,
+    hasMcpJson: !!p.hasMcpJson,
+    hasCursorMcpJson: !!p.hasCursorMcpJson,
+    pinned: !!p.pinned,
+    discovered: !!p.discovered,
+    artifactCount: p.artifactCount ?? 0,
+  };
 }
 
 export function emptySnapshot(): ScanSnapshot {
@@ -97,7 +127,8 @@ export function normalizeSnapshot(
   const bundles: Array<Partial2<Collection>> = [g, ...arr(raw.projects)];
   const projects: ProjectInfo[] = arr(raw.projects)
     .map((p) => p.project)
-    .filter((p): p is ProjectInfo => !!p);
+    .filter((p): p is ProjectInfo => !!p)
+    .map(normalizeProjectInfo);
 
   const artifacts: ConfigArtifact[] = [];
   const settingsLayers = [] as ScanSnapshot["settingsLayers"];
@@ -109,7 +140,7 @@ export function normalizeSnapshot(
   const rawMcp: McpServerEntry[] = [];
 
   for (const b of bundles) {
-    artifacts.push(...arr(b.artifacts));
+    artifacts.push(...arr(b.artifacts).map((a) => withProduct(a)));
     settingsLayers.push(...arr(b.settingsLayers));
     errors.push(...arr(b.errors));
     rawSkills.push(...arr(b.skills));
@@ -120,26 +151,31 @@ export function normalizeSnapshot(
   }
 
   const mtimeByPath = new Map<string, Timestamp>();
+  const productByPath = new Map<string, Product>();
   for (const a of artifacts) {
     if (a.modifiedAt && !mtimeByPath.has(a.path)) mtimeByPath.set(a.path, a.modifiedAt);
+    if (!productByPath.has(a.path)) productByPath.set(a.path, resolveProduct(a.product));
   }
   const mt = (path: string): Timestamp => mtimeByPath.get(path) ?? null;
+  /** Prefer entry.product, else matching artifact, else Claude Code. */
+  const productFor = (path: string, own?: Product | null): Product =>
+    resolveProduct(own ?? productByPath.get(path));
 
   const skills: UiSkill[] = rawSkills.map((s) => ({
-    ...s,
+    ...withProduct(s, productByPath.get(s.path)),
     id: `${s.kind}:${s.path}`,
     artifactId: s.path,
     mtime: mt(s.path),
   }));
   const rules: UiRule[] = rawRules.map((r) => ({
-    ...r,
+    ...withProduct(r, productByPath.get(r.path)),
     paths: arr(r.paths),
     id: `rule:${r.path}`,
     artifactId: r.path,
     mtime: mt(r.path),
   }));
   const agents: UiAgent[] = rawAgents.map((a) => ({
-    ...a,
+    ...withProduct(a, productByPath.get(a.path)),
     tools: arr(a.tools),
     id: `agent:${a.path}`,
     artifactId: a.path,
@@ -149,9 +185,11 @@ export function normalizeSnapshot(
   // Hooks/MCP servers have no own file: they point at the declaring file.
   const sourceStatus = (path: string): DiscoveryStatus =>
     artifacts.find((a) => a.path === path)?.status ?? "present";
+  const sourceProduct = (path: string, own?: Product | null): Product => productFor(path, own);
 
   const hooks: UiHook[] = rawHooks.map((h, i) => ({
     ...h,
+    product: sourceProduct(h.sourcePath, h.product),
     id: `hook:${h.sourcePath}:${h.event}:${h.matcher ?? ""}:${i}`,
     artifactId: h.sourcePath,
     path: h.sourcePath,
@@ -160,6 +198,7 @@ export function normalizeSnapshot(
   }));
   const mcpServers: UiMcpServer[] = rawMcp.map((s) => ({
     ...s,
+    product: sourceProduct(s.sourcePath, s.product),
     args: arr(s.args),
     id: `mcp:${s.sourcePath}:${s.projectPath ?? ""}:${s.name}`,
     artifactId: s.sourcePath,
@@ -188,6 +227,7 @@ export function normalizeSnapshot(
       configDir: g.configDir ?? "",
       managedDir: g.managedDir ?? "",
       claudeJsonPath: g.claudeJsonPath ?? "",
+      cursorConfigDir: g.cursorConfigDir ?? null,
       credentialsPresent: !!g.credentialsPresent,
     },
   };

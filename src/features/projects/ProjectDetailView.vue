@@ -48,6 +48,7 @@ const items = computed<BrowserItem[]>(() => {
       projectPath: h.projectPath,
       artifactId: h.sourcePath,
       kind: "hook",
+      product: h.product,
     });
   }
   for (const s of scan.mcpServers) {
@@ -63,6 +64,7 @@ const items = computed<BrowserItem[]>(() => {
       projectPath: s.projectPath,
       artifactId: s.sourcePath,
       kind: "mcpServer",
+      product: s.product,
     });
   }
   return [...out.values()];
@@ -89,7 +91,9 @@ const items = computed<BrowserItem[]>(() => {
         <div class="flex items-center gap-2">
           <span class="truncate text-[13px] font-semibold">{{ project.name }}</span>
           <Badge v-if="project.pinned" tone="accent">закреплён</Badge>
-          <Badge v-if="!project.hasClaudeDir">нет .claude</Badge>
+          <Badge v-if="project.hasClaudeDir" mono tone="info">.claude</Badge>
+          <Badge v-if="project.hasCursorDir" mono tone="accent">.cursor</Badge>
+          <Badge v-if="!project.hasClaudeDir && !project.hasCursorDir">нет .claude / .cursor</Badge>
         </div>
         <div class="truncate font-mono text-2xs text-subtle" :title="project.path">
           {{ shortenPath(project.path) }}
@@ -112,7 +116,7 @@ const items = computed<BrowserItem[]>(() => {
         :loading="!scan.initialized"
         kind-filter
         empty-title="Нет проектной конфигурации"
-        empty-description="В этом проекте не найдены каталог .claude, CLAUDE.md или .mcp.json."
+        empty-description="В этом проекте не найдены каталоги .claude / .cursor, CLAUDE.md, AGENTS.md или .mcp.json."
       />
       <div v-else class="h-full overflow-y-auto">
         <div class="mx-auto max-w-5xl px-6 py-5">

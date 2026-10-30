@@ -1,6 +1,6 @@
 [package]
 name = "agent-scope"
-version = "0.1.0"
+version = "0.2.0"
 description = "Agent Scope — local Claude Code configuration manager"
 authors = ["Agent Scope"]
 edition = "2021"

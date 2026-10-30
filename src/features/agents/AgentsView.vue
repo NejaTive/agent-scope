@@ -20,6 +20,7 @@ const items = computed<BrowserItem[]>(() =>
     projectPath: a.projectPath,
     artifactId: a.artifactId,
     kind: "agent",
+    product: a.product,
     searchText: [a.model, ...(a.tools ?? [])].filter(Boolean).join(" "),
   })),
 );
@@ -30,7 +31,7 @@ const items = computed<BrowserItem[]>(() =>
     :items="items"
     :loading="!scan.initialized"
     empty-title="Агенты не найдены"
-    empty-description="Субагенты лежат в .claude/agents/*.md на уровне пользователя или проекта."
+    empty-description="Субагенты лежат в .claude/agents/*.md и .cursor/agents/*.md на уровне пользователя или проекта."
   >
     <template #detail="{ item }">
       <FieldList

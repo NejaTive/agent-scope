@@ -23,6 +23,7 @@ const items = computed<BrowserItem[]>(() =>
     projectPath: s.projectPath,
     artifactId: s.sourcePath,
     kind: "mcpServer",
+    product: s.product,
     searchText: [s.serverType, s.origin, s.command, s.url].filter(Boolean).join(" "),
   })),
 );
@@ -55,7 +56,7 @@ function recordFields(prefix: string, s: McpServerEntry, key: string): Field[] {
     collapsed-content
     content-label="Исходный файл"
     empty-title="MCP-серверы не настроены"
-    empty-description="Серверы объявляются в .mcp.json, ~/.claude.json и файлах настроек."
+    empty-description="Серверы объявляются в .mcp.json, ~/.claude.json, ~/.cursor/mcp.json и файлах настроек."
   >
     <template #detail="{ item }">
       <template v-if="byId.get(item.id)">

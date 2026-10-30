@@ -47,6 +47,11 @@ export type DiscoveryStatus =
 
 export type Confidence = "computed" | "inferred" | "unknown";
 
+/** Claude Code vs Cursor product tagging (`product` field). */
+export type Tooling = "claude" | "cursor";
+/** @deprecated Prefer `Tooling`. */
+export type Product = Tooling;
+
 export type ConflictKind = "duplicateName" | "mcpMismatch" | "settingOverride";
 export type ConflictSeverity = "info" | "warning";
 
@@ -74,6 +79,8 @@ export interface ConfigArtifact {
   /** Relative file listing for directory-like artifacts (skills). */
   children: string[];
   metadata: Json;
+  /** Claude Code vs Cursor; omit / missing → UI treats as `"claude"`. */
+  product?: Tooling | null;
 }
 
 export interface ProjectInfo {
@@ -82,6 +89,10 @@ export interface ProjectInfo {
   hasClaudeDir: boolean;
   hasClaudeMd: boolean;
   hasMcpJson: boolean;
+  /** Present when the project has a `.cursor` directory. */
+  hasCursorDir: boolean;
+  /** Present when the project has `.cursor/mcp.json`. */
+  hasCursorMcpJson: boolean;
   pinned: boolean;
   discovered: boolean;
   artifactCount: number;
@@ -112,6 +123,7 @@ export interface HookEntry {
   scope: Scope;
   sourcePath: string;
   projectPath?: string | null;
+  product?: Product | null;
   details: Json;
 }
 
@@ -120,6 +132,7 @@ export interface McpServerEntry {
   scope: Scope;
   sourcePath: string;
   projectPath?: string | null;
+  product?: Product | null;
   /** `.mcp.json`, `~/.claude.json`, `~/.claude.json#projects`, `managed-mcp.json` */
   origin: string;
   /** `stdio`, `http`, `sse`, ... */
@@ -139,6 +152,7 @@ export interface SkillEntry {
   scope: Scope;
   path: string;
   projectPath?: string | null;
+  product?: Product | null;
   status: DiscoveryStatus;
   frontmatter: Json;
   files: string[];
@@ -149,6 +163,7 @@ export interface RuleEntry {
   scope: Scope;
   path: string;
   projectPath?: string | null;
+  product?: Product | null;
   paths: string[];
   conditional: boolean;
   status: DiscoveryStatus;
@@ -160,6 +175,7 @@ export interface AgentEntry {
   scope: Scope;
   path: string;
   projectPath?: string | null;
+  product?: Product | null;
   tools: string[];
   model?: string | null;
   /** name + description both present */
@@ -184,6 +200,8 @@ export interface GlobalBundle extends Collection {
   configDir: string;
   managedDir: string;
   claudeJsonPath: string;
+  /** User Cursor config root (`~/.cursor`), when known. */
+  cursorConfigDir?: string | null;
   credentialsPresent: boolean;
 }
 
@@ -309,6 +327,7 @@ export type AppPreferences = Preferences;
 export interface SearchFilters {
   kind?: ArtifactKind | null;
   scope?: Scope | null;
+  product?: Product | null;
 }
 
 /** `search_artifacts` returns plain artifacts. */
@@ -349,6 +368,8 @@ export interface GlobalMeta {
   configDir: string;
   managedDir: string;
   claudeJsonPath: string;
+  /** User Cursor config root (`~/.cursor`), when known. */
+  cursorConfigDir?: string | null;
   credentialsPresent: boolean;
 }
 
