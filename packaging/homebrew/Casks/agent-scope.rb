@@ -8,7 +8,7 @@ cask "agent-scope" do
   desc "Read-only viewer for Claude Code and Cursor configs"
   homepage "https://github.com/NejaTive/agent-scope"
 
-  depends_on macos: ">= :big_sur"
+  depends_on macos: :big_sur
   depends_on arch: :arm64
 
   app "Agent Scope.app"
