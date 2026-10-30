@@ -4,14 +4,7 @@
 
 Cask token: `agent-scope`. Установка только на **Apple Silicon (aarch64)**; Intel не поддерживается.
 
-Шаблон cask в этом репозитории: [`packaging/homebrew/Casks/agent-scope.rb`](../packaging/homebrew/Casks/agent-scope.rb).
-
-## Создать / обновить tap
-
-1. Создай (или клонируй) репозиторий `NejaTive/homebrew-agent-scope` на GitHub.
-2. Скопируй шаблон из `packaging/homebrew/Casks/agent-scope.rb` этого репо в `Casks/agent-scope.rb` tap-репозитория.
-3. Заполни `sha256` реальным хешем DMG из GitHub Release (см. чеклист ниже).
-4. Закоммить и запушь в `homebrew-agent-scope`.
+Источник cask: [`Casks/agent-scope.rb`](https://github.com/NejaTive/homebrew-agent-scope/blob/main/Casks/agent-scope.rb) в tap-репозитории.
 
 Структура tap:
 
