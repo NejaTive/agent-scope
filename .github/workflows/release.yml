@@ -22,14 +22,6 @@ permissions:
 jobs:
   release-macos:
     runs-on: macos-15
-    # Map secrets to env so optional signing can be gated without `secrets` in `if:`
-    # (GitHub rejects `secrets.*` inside `if` expressions).
-    env:
-      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,11 +43,18 @@ jobs:
             npm install
           fi
 
-      # Optional: import Developer ID cert when secrets are present.
-      # Keep this gated so CI stays green without an Apple Developer account.
+      # Optional signing: do not put empty APPLE_* into the job env — Tauri treats
+      # present-but-empty APPLE_CERTIFICATE as "sign with this PKCS#12" and fails.
+      # Gate inside the step (secrets.* cannot be used in `if:` expressions).
       - name: Import Apple signing certificate
-        if: env.APPLE_CERTIFICATE != '' && env.APPLE_CERTIFICATE_PASSWORD != ''
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
+          if [ -z "${APPLE_CERTIFICATE}" ] || [ -z "${APPLE_CERTIFICATE_PASSWORD}" ]; then
+            echo "No Apple signing secrets; building unsigned/ad-hoc DMG."
+            exit 0
+          fi
           CERTIFICATE_PATH="$RUNNER_TEMP/build_certificate.p12"
           KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
           echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERTIFICATE_PATH"
@@ -67,10 +66,14 @@ jobs:
           security list-keychain -d user -s "$KEYCHAIN_PATH"
           security set-key-partition-list -S apple-tool:,apple: -s \
             -k "" "$KEYCHAIN_PATH"
+          {
+            echo "APPLE_ID=${{ secrets.APPLE_ID }}"
+            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}"
+            echo "APPLE_PASSWORD=${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}"
+          } >> "$GITHUB_ENV"
           echo "Apple certificate imported (signing enabled for this run)."
 
       - name: Build Tauri app (DMG)
-        # APPLE_ID / APPLE_TEAM_ID / APPLE_PASSWORD come from job env (empty → unsigned).
         run: npm run tauri:build
 
       - name: Locate DMG, checksum, stabilize filename
