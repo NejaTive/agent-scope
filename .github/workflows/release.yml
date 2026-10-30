@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   release-macos:
-    runs-on: macos-14
+    runs-on: macos-15
     # Map secrets to env so optional signing can be gated without `secrets` in `if:`
     # (GitHub rejects `secrets.*` inside `if` expressions).
     env:
