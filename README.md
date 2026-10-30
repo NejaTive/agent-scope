@@ -23,10 +23,23 @@
 
 ## Требования
 
-- macOS 11+ (Apple Silicon; Intel через cross-compile / universal build)
+- macOS 11+ (Big Sur), **только Apple Silicon (aarch64)** — Intel не поддерживается
 - [Node.js](https://nodejs.org/) 20+
 - [Rust](https://rustup.rs/) stable
 - Xcode Command Line Tools
+
+## Установка / Homebrew
+
+Только Apple Silicon. Без нотаризации Gatekeeper может предупредить при первом запуске (Правый клик → Открыть, или снять quarantine через `xattr`).
+
+```bash
+brew tap nejative/agent-scope
+brew install --cask agent-scope
+# обновление
+brew upgrade --cask agent-scope
+```
+
+Для мейнтейнеров: как обновлять tap и релизный чеклист — [docs/homebrew.md](docs/homebrew.md).
 
 ## Разработка
 

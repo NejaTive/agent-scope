@@ -1,0 +1,137 @@
+# Release macOS DMG on version tags (v*).
+#
+# Optional Apple signing / notarization secrets (repo Settings → Secrets).
+# Without them the job still builds an unsigned/ad-hoc DMG and publishes a Release.
+#   APPLE_CERTIFICATE              # base64-encoded Developer ID .p12
+#   APPLE_CERTIFICATE_PASSWORD
+#   APPLE_ID
+#   APPLE_TEAM_ID
+#   APPLE_APP_SPECIFIC_PASSWORD    # or App Store Connect API key instead
+# See docs/homebrew.md § «Секреты Apple».
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release-macos:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Setup Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      # Optional: import Developer ID cert + notarize when secrets are present.
+      # Keep this gated so CI stays green without an Apple Developer account.
+      - name: Import Apple signing certificate
+        if: ${{ secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' }}
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH="$RUNNER_TEMP/build_certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERTIFICATE_PATH"
+          security create-keychain -p "" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -s \
+            -k "" "$KEYCHAIN_PATH"
+          echo "Apple certificate imported (signing enabled for this run)."
+
+      - name: Build Tauri app (DMG)
+        # When APPLE_* secrets are set, configure TAURI_SIGNING / notarization
+        # env here (product-specific). Without secrets, build proceeds unsigned.
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: npm run tauri:build
+
+      - name: Locate DMG, checksum, stabilize filename
+        id: dmg
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          STABLE_NAME="Agent Scope_${VERSION}_aarch64.dmg"
+          BUNDLE_DMG_DIR="src-tauri/target/release/bundle/dmg"
+
+          echo "Looking for DMG under ${BUNDLE_DMG_DIR} (and bundle/)..."
+          DMG_PATH="$(find src-tauri/target/release/bundle -type f -name '*.dmg' | head -n 1 || true)"
+          if [ -z "${DMG_PATH}" ]; then
+            echo "::error::No .dmg found under src-tauri/target/release/bundle"
+            ls -laR src-tauri/target/release/bundle || true
+            exit 1
+          fi
+          echo "Found: ${DMG_PATH}"
+
+          OUT_DIR="$(dirname "${DMG_PATH}")"
+          STABLE_PATH="${OUT_DIR}/${STABLE_NAME}"
+          if [ "$(basename "${DMG_PATH}")" != "${STABLE_NAME}" ]; then
+            cp "${DMG_PATH}" "${STABLE_PATH}"
+          fi
+
+          SHA256="$(shasum -a 256 "${STABLE_PATH}" | awk '{print $1}')"
+          echo "DMG: ${STABLE_PATH}"
+          echo "sha256: ${SHA256}"
+
+          {
+            echo "## Release DMG"
+            echo ""
+            echo "- **Asset:** \`${STABLE_NAME}\`"
+            echo "- **sha256:** \`${SHA256}\`"
+            echo "- **Tag:** \`${GITHUB_REF_NAME}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "path=${STABLE_PATH}" >> "$GITHUB_OUTPUT"
+          echo "name=${STABLE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Agent Scope ${{ steps.dmg.outputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: ${{ steps.dmg.outputs.path }}
+          body: |
+            macOS Apple Silicon (aarch64) DMG.
+
+            **Asset:** `Agent Scope_${{ steps.dmg.outputs.version }}_aarch64.dmg`
+            **sha256:** `${{ steps.dmg.outputs.sha256 }}`
+
+            Homebrew: after updating the tap cask `sha256` / `version`, users can:
+            ```bash
+            brew tap nejative/agent-scope
+            brew install --cask agent-scope
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
