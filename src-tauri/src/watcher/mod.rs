@@ -1,0 +1,285 @@
+//! Debounced file watching (notify). Observes only; never writes to watched files.
+
+use crate::errors::AppResult;
+use crate::models::ChangeEvent;
+use crate::paths::{is_skipped_dir, Paths, PROJECT_FILE_NAMES};
+use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+pub const DEBOUNCE: Duration = Duration::from_millis(400);
+
+pub type Sink = Arc<dyn Fn(ChangeEvent) + Send + Sync + 'static>;
+
+/// Dropping the handle stops watching (the event thread exits when the channel closes).
+pub struct WatcherHandle {
+    _watcher: RecommendedWatcher,
+    pub targets: Vec<PathBuf>,
+}
+
+pub fn kind_str(kind: &EventKind) -> Option<&'static str> {
+    match kind {
+        EventKind::Create(_) => Some("created"),
+        EventKind::Remove(_) => Some("removed"),
+        EventKind::Modify(notify::event::ModifyKind::Name(_)) => Some("renamed"),
+        EventKind::Modify(_) => Some("modified"),
+        // Access / Any / Other are noise.
+        _ => None,
+    }
+}
+
+/// Which changed paths are worth reporting.
+pub fn is_relevant(path: &Path, paths: &Paths, project_roots: &[PathBuf]) -> bool {
+    let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    if name == ".DS_Store" || name == ".credentials.json" || name.ends_with('~') || name.ends_with(".swp")
+        || name.ends_with(".tmp") || name.starts_with(".#")
+    {
+        return false;
+    }
+    if path.components().any(|c| is_skipped_dir(&c.as_os_str().to_string_lossy())) {
+        return false;
+    }
+    if path == paths.claude_json {
+        return true;
+    }
+    if let Ok(rel) = path.strip_prefix(&paths.config_dir) {
+        let comps: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
+        return match comps.first().map(|s| s.as_str()) {
+            Some("projects") => comps.iter().any(|c| c == "memory"),
+            Some("settings.json") | Some("CLAUDE.md") | Some("rules") | Some("skills") | Some("commands")
+            | Some("agents") | Some("output-styles") | Some("workflows") | Some("plugins") => true,
+            _ => false,
+        };
+    }
+    if path.starts_with(&paths.managed_dir) {
+        return true;
+    }
+    for root in project_roots {
+        if let Ok(rel) = path.strip_prefix(root) {
+            let first = rel.components().next().map(|c| c.as_os_str().to_string_lossy().to_string());
+            if first.as_deref() == Some(".claude") {
+                return true;
+            }
+            if rel.components().count() == 1 && PROJECT_FILE_NAMES.contains(&name.as_str()) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Directories/files to subscribe to. Only paths that exist are returned.
+pub fn watch_targets(paths: &Paths, project_roots: &[PathBuf]) -> Vec<(PathBuf, RecursiveMode)> {
+    let mut v: Vec<(PathBuf, RecursiveMode)> = Vec::new();
+    let mut push = |p: PathBuf, m: RecursiveMode| {
+        if p.exists() && !v.iter().any(|(q, _)| q == &p) {
+            v.push((p, m));
+        }
+    };
+    // Config dir itself (non-recursive: settings.json, CLAUDE.md) + specific subtrees.
+    // `projects/` is deliberately skipped — transcripts churn constantly.
+    push(paths.config_dir.clone(), RecursiveMode::NonRecursive);
+    for sub in ["rules", "skills", "commands", "agents", "output-styles", "workflows", "plugins"] {
+        push(paths.config_dir.join(sub), RecursiveMode::Recursive);
+    }
+    if let Some(parent) = paths.claude_json.parent() {
+        push(parent.to_path_buf(), RecursiveMode::NonRecursive);
+    }
+    push(paths.managed_dir.clone(), RecursiveMode::NonRecursive);
+    for root in project_roots {
+        push(root.clone(), RecursiveMode::NonRecursive);
+        push(root.join(".claude"), RecursiveMode::Recursive);
+    }
+    v
+}
+
+/// Coalesces bursts of events per path; emits once a path has been quiet for `delay`.
+#[derive(Debug)]
+pub struct Debouncer {
+    delay: Duration,
+    pending: HashMap<PathBuf, (&'static str, Instant)>,
+}
+
+impl Debouncer {
+    pub fn new(delay: Duration) -> Self {
+        Self { delay, pending: HashMap::new() }
+    }
+
+    pub fn push(&mut self, path: PathBuf, kind: &'static str, now: Instant) {
+        let merged = match self.pending.get(&path).map(|(k, _)| *k) {
+            // created-then-modified is still "created"; removed-then-created is a modification.
+            Some("created") if kind == "modified" => "created",
+            Some("removed") if kind == "created" => "modified",
+            _ => kind,
+        };
+        self.pending.insert(path, (merged, now));
+    }
+
+    pub fn drain_ready(&mut self, now: Instant) -> Vec<ChangeEvent> {
+        let ready: Vec<PathBuf> = self
+            .pending
+            .iter()
+            .filter(|(_, (_, t))| now.duration_since(*t) >= self.delay)
+            .map(|(p, _)| p.clone())
+            .collect();
+        let mut out: Vec<ChangeEvent> = ready
+            .into_iter()
+            .filter_map(|p| {
+                self.pending.remove(&p).map(|(k, _)| ChangeEvent {
+                    path: p.to_string_lossy().to_string(),
+                    kind: k.to_string(),
+                })
+            })
+            .collect();
+        out.sort_by(|a, b| a.path.cmp(&b.path));
+        out
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.pending.is_empty()
+    }
+}
+
+/// FSEvents reports resolved paths, so match against canonical locations.
+fn canonical_paths(p: &Paths) -> Paths {
+    let canon = |x: &Path| dunce::canonicalize(x).unwrap_or_else(|_| x.to_path_buf());
+    let claude_json = match (p.claude_json.parent(), p.claude_json.file_name()) {
+        (Some(parent), Some(name)) => canon(parent).join(name),
+        _ => p.claude_json.clone(),
+    };
+    Paths {
+        home: canon(&p.home),
+        config_dir: canon(&p.config_dir),
+        claude_json,
+        managed_dir: canon(&p.managed_dir),
+    }
+}
+
+pub fn start(paths: Paths, project_roots: Vec<PathBuf>, sink: Sink) -> AppResult<WatcherHandle> {
+    let paths = canonical_paths(&paths);
+    let project_roots: Vec<PathBuf> =
+        project_roots.iter().map(|r| dunce::canonicalize(r).unwrap_or_else(|_| r.clone())).collect();
+    let (tx, rx) = mpsc::channel::<notify::Result<Event>>();
+    let mut watcher = notify::recommended_watcher(move |res| {
+        let _ = tx.send(res);
+    })?;
+    let targets = watch_targets(&paths, &project_roots);
+    let mut watched = Vec::new();
+    for (p, mode) in &targets {
+        // Individual failures (permissions, vanished dirs) shouldn't stop the whole watcher.
+        if watcher.watch(p, *mode).is_ok() {
+            watched.push(p.clone());
+        }
+    }
+
+    std::thread::Builder::new()
+        .name("agent-scope-watcher".into())
+        .spawn(move || {
+            let mut deb = Debouncer::new(DEBOUNCE);
+            loop {
+                match rx.recv_timeout(Duration::from_millis(100)) {
+                    Ok(Ok(ev)) => {
+                        if let Some(kind) = kind_str(&ev.kind) {
+                            let now = Instant::now();
+                            for p in ev.paths {
+                                if is_relevant(&p, &paths, &project_roots) {
+                                    deb.push(p, kind, now);
+                                }
+                            }
+                        }
+                    }
+                    Ok(Err(_)) => {}
+                    Err(mpsc::RecvTimeoutError::Timeout) => {}
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                }
+                if !deb.is_empty() {
+                    for ev in deb.drain_ready(Instant::now()) {
+                        sink(ev);
+                    }
+                }
+            }
+        })
+        .map_err(|e| crate::errors::AppError::Watcher(e.to_string()))?;
+
+    Ok(WatcherHandle { _watcher: watcher, targets: watched })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn debounce_coalesces() {
+        let mut d = Debouncer::new(Duration::from_millis(400));
+        let t0 = Instant::now();
+        let p = PathBuf::from("/a/settings.json");
+        d.push(p.clone(), "modified", t0);
+        d.push(p.clone(), "modified", t0 + Duration::from_millis(300));
+        assert!(d.drain_ready(t0 + Duration::from_millis(500)).is_empty());
+        let out = d.drain_ready(t0 + Duration::from_millis(800));
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].kind, "modified");
+        assert!(d.is_empty());
+    }
+
+    #[test]
+    fn kind_merging() {
+        let mut d = Debouncer::new(Duration::ZERO);
+        let t = Instant::now();
+        d.push("/x".into(), "created", t);
+        d.push("/x".into(), "modified", t);
+        d.push("/y".into(), "removed", t);
+        d.push("/y".into(), "created", t);
+        let out = d.drain_ready(t + Duration::from_millis(1));
+        assert_eq!(out[0].kind, "created");
+        assert_eq!(out[1].kind, "modified");
+    }
+
+    #[test]
+    fn relevance_filter() {
+        let d = tempdir().unwrap();
+        let paths = Paths::for_root(d.path());
+        let proj = d.path().join("proj");
+        let roots = vec![proj.clone()];
+        assert!(is_relevant(&paths.config_dir.join("settings.json"), &paths, &roots));
+        assert!(is_relevant(&paths.config_dir.join("skills/x/SKILL.md"), &paths, &roots));
+        assert!(is_relevant(&paths.config_dir.join("projects/a/memory/MEMORY.md"), &paths, &roots));
+        assert!(!is_relevant(&paths.config_dir.join("projects/a/t.jsonl"), &paths, &roots));
+        assert!(!is_relevant(&paths.config_dir.join(".credentials.json"), &paths, &roots));
+        assert!(!is_relevant(&paths.config_dir.join("history.jsonl"), &paths, &roots));
+        assert!(is_relevant(&paths.claude_json, &paths, &roots));
+        assert!(is_relevant(&proj.join("CLAUDE.md"), &paths, &roots));
+        assert!(is_relevant(&proj.join(".claude/settings.json"), &paths, &roots));
+        assert!(!is_relevant(&proj.join("src/main.rs"), &paths, &roots));
+        assert!(!is_relevant(&proj.join(".claude/node_modules/x"), &paths, &roots));
+        assert!(!is_relevant(&d.path().join("random.txt"), &paths, &roots));
+    }
+
+    #[test]
+    fn targets_only_existing() {
+        let d = tempdir().unwrap();
+        let paths = Paths::for_root(d.path());
+        std::fs::create_dir_all(paths.config_dir.join("rules")).unwrap();
+        let proj = d.path().join("p");
+        std::fs::create_dir_all(proj.join(".claude")).unwrap();
+        let t = watch_targets(&paths, &[proj.clone()]);
+        assert!(t.iter().any(|(p, m)| p == &paths.config_dir.join("rules") && *m == RecursiveMode::Recursive));
+        assert!(t.iter().any(|(p, _)| p == &proj.join(".claude")));
+        assert!(!t.iter().any(|(p, _)| p == &paths.config_dir.join("skills")));
+    }
+
+    #[test]
+    fn live_watch_smoke() {
+        // Starts and stops cleanly on a tempdir; event delivery itself is OS dependent.
+        let d = tempdir().unwrap();
+        let paths = Paths::for_root(d.path());
+        std::fs::create_dir_all(&paths.config_dir).unwrap();
+        let h = start(paths, vec![], Arc::new(|_| {})).unwrap();
+        assert!(!h.targets.is_empty());
+        drop(h);
+    }
+}

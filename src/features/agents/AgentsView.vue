@@ -1,0 +1,46 @@
+<script setup lang="ts">
+import { computed } from "vue";
+import { useScanStore } from "@/stores/scan";
+import type { BrowserItem } from "@/lib/browser";
+import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
+import FieldList from "@/components/common/FieldList.vue";
+
+const scan = useScanStore();
+const byId = computed(() => new Map(scan.agents.map((a) => [a.id, a])));
+
+const items = computed<BrowserItem[]>(() =>
+  scan.agents.map((a) => ({
+    id: a.id,
+    name: a.name,
+    subtitle: a.description ?? null,
+    scope: a.scope,
+    status: a.status,
+    mtime: a.mtime,
+    path: a.path,
+    projectPath: a.projectPath,
+    artifactId: a.artifactId,
+    kind: "agent",
+    searchText: [a.model, ...(a.tools ?? [])].filter(Boolean).join(" "),
+  })),
+);
+</script>
+
+<template>
+  <ArtifactBrowser
+    :items="items"
+    :loading="!scan.initialized"
+    empty-title="No agents found"
+    empty-description="Subagents live in .claude/agents/*.md at user or project level."
+  >
+    <template #detail="{ item }">
+      <FieldList
+        title="Frontmatter"
+        :fields="[
+          { label: 'Model', value: byId.get(item.id)?.model },
+          { label: 'Tools', value: byId.get(item.id)?.tools },
+          { label: 'Valid', value: byId.get(item.id)?.valid === false ? 'missing name or description' : null },
+        ]"
+      />
+    </template>
+  </ArtifactBrowser>
+</template>

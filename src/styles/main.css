@@ -1,0 +1,226 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Design tokens (space-separated RGB triplets so Tailwind alpha works)
+   Neutral zinc surfaces + one muted teal accent.
+--------------------------------------------------------------------------- */
+:root {
+  color-scheme: light;
+  --bg: 250 250 250;
+  --surface: 255 255 255;
+  --elevated: 244 244 245;
+  --border: 228 228 231;
+  --fg: 24 24 27;
+  --muted: 82 82 91;
+  --subtle: 140 140 150;
+  --accent: 15 118 110;
+  --accent-fg: 255 255 255;
+  --ok: 22 128 74;
+  --warn: 180 110 10;
+  --danger: 190 50 50;
+  --info: 55 100 160;
+
+  --hl-keyword: 168 60 100;
+  --hl-string: 22 110 80;
+  --hl-number: 170 100 20;
+  --hl-comment: 140 140 150;
+  --hl-title: 40 100 170;
+  --hl-attr: 15 118 110;
+}
+
+.dark {
+  color-scheme: dark;
+  --bg: 14 15 17;
+  --surface: 19 20 23;
+  --elevated: 28 29 33;
+  --border: 40 41 46;
+  --fg: 228 228 231;
+  --muted: 161 161 170;
+  --subtle: 113 113 122;
+  --accent: 94 186 174;
+  --accent-fg: 8 24 22;
+  --ok: 94 190 130;
+  --warn: 214 168 80;
+  --danger: 224 108 108;
+  --info: 120 160 210;
+
+  --hl-keyword: 214 140 170;
+  --hl-string: 130 200 160;
+  --hl-number: 220 170 100;
+  --hl-comment: 113 113 122;
+  --hl-title: 130 175 225;
+  --hl-attr: 110 200 190;
+}
+
+@layer base {
+  html,
+  body,
+  #app {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-bg font-sans text-fg antialiased;
+    font-size: 13px;
+    line-height: 1.45;
+    overflow: hidden;
+  }
+
+  ::selection {
+    background: rgb(var(--accent) / 0.3);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--border)) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgb(var(--border));
+    border-radius: 6px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--subtle) / 0.6);
+    background-clip: content-box;
+    border: 2px solid transparent;
+  }
+
+  :focus-visible {
+    outline: 1px solid rgb(var(--accent));
+    outline-offset: 1px;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex h-7 items-center gap-1.5 rounded-md border border-line bg-surface px-2.5 text-xs font-medium text-fg transition-colors hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted transition-colors hover:bg-elevated hover:text-fg disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-accent {
+    @apply inline-flex h-7 items-center gap-1.5 rounded-md border border-accent/40 bg-accent/15 px-2.5 text-xs font-medium text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .input {
+    @apply h-7 rounded-md border border-line bg-surface px-2 text-xs text-fg placeholder:text-subtle focus:border-accent/60 focus:outline-none;
+  }
+  .card {
+    @apply rounded-lg border border-line bg-surface;
+  }
+  .label {
+    @apply text-2xs font-medium uppercase tracking-wider text-subtle;
+  }
+  .chip {
+    @apply inline-flex h-6 items-center gap-1 rounded-md border border-transparent px-2 text-xs text-muted transition-colors hover:bg-elevated hover:text-fg;
+  }
+  .chip-active {
+    @apply border-line bg-elevated text-fg;
+  }
+  .th {
+    @apply sticky top-0 z-10 bg-surface px-3 py-1.5 text-left text-2xs font-medium uppercase tracking-wider text-subtle;
+  }
+  .td {
+    @apply px-3 py-1.5 align-top;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   highlight.js theme driven by CSS variables
+--------------------------------------------------------------------------- */
+.hljs {
+  color: rgb(var(--fg));
+  background: transparent;
+}
+.hljs-comment,
+.hljs-quote {
+  color: rgb(var(--hl-comment));
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-doctag,
+.hljs-section {
+  color: rgb(var(--hl-keyword));
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-meta .hljs-string {
+  color: rgb(var(--hl-string));
+}
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet {
+  color: rgb(var(--hl-number));
+}
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.function_,
+.hljs-built_in,
+.hljs-type {
+  color: rgb(var(--hl-title));
+}
+.hljs-attr,
+.hljs-attribute,
+.hljs-name,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-property {
+  color: rgb(var(--hl-attr));
+}
+.hljs-deletion {
+  color: rgb(var(--danger));
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------------
+   Markdown rendering tweaks on top of @tailwindcss/typography
+--------------------------------------------------------------------------- */
+.md-body {
+  --tw-prose-body: rgb(var(--fg) / 0.88);
+  --tw-prose-headings: rgb(var(--fg));
+  --tw-prose-lead: rgb(var(--muted));
+  --tw-prose-links: rgb(var(--accent));
+  --tw-prose-bold: rgb(var(--fg));
+  --tw-prose-counters: rgb(var(--subtle));
+  --tw-prose-bullets: rgb(var(--subtle));
+  --tw-prose-hr: rgb(var(--border));
+  --tw-prose-quotes: rgb(var(--muted));
+  --tw-prose-quote-borders: rgb(var(--border));
+  --tw-prose-captions: rgb(var(--subtle));
+  --tw-prose-code: rgb(var(--fg));
+  --tw-prose-pre-code: rgb(var(--fg));
+  --tw-prose-pre-bg: rgb(var(--elevated));
+  --tw-prose-th-borders: rgb(var(--border));
+  --tw-prose-td-borders: rgb(var(--border));
+}
+.md-body :not(pre) > code {
+  @apply rounded bg-elevated px-1 py-0.5 font-mono text-[0.85em] font-normal;
+}
+.md-body :not(pre) > code::before,
+.md-body :not(pre) > code::after {
+  content: none;
+}
+.md-body pre {
+  @apply rounded-md border border-line;
+}
+.md-body pre code {
+  @apply bg-transparent p-0 font-mono;
+}
+.md-body a {
+  @apply no-underline hover:underline;
+}

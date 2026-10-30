@@ -1,0 +1,123 @@
+<script setup lang="ts">
+import { computed } from "vue";
+import { RouterLink, useRoute } from "vue-router";
+import { useScanStore } from "@/stores/scan";
+import { relativeTime } from "@/lib/format";
+import Icon, { type IconName } from "@/components/common/Icon.vue";
+import StatusDot from "@/components/common/StatusDot.vue";
+
+interface NavItem {
+  to: string;
+  label: string;
+  icon: IconName;
+  count?: number;
+  /** Route names/prefixes that keep this item highlighted. */
+  match?: string;
+}
+
+const scan = useScanStore();
+const route = useRoute();
+
+const main = computed<NavItem[]>(() => {
+  const d = scan.dashboard;
+  return [
+    { to: "/", label: "Overview", icon: "dashboard" },
+    { to: "/global", label: "Global Configuration", icon: "globe" },
+    { to: "/projects", label: "Projects", icon: "folder", count: d.projectCount, match: "/projects" },
+    { to: "/skills", label: "Skills", icon: "zap", count: scan.skillEntries.length },
+    { to: "/rules", label: "Rules", icon: "file-text", count: d.rules },
+    { to: "/agents", label: "Agents", icon: "bot", count: d.agents },
+    { to: "/hooks", label: "Hooks", icon: "link", count: d.hooks },
+    { to: "/mcp", label: "MCP Servers", icon: "server", count: d.mcpServers },
+    { to: "/plugins", label: "Plugins", icon: "box", count: d.plugins },
+    { to: "/permissions", label: "Permissions", icon: "shield" },
+    { to: "/settings", label: "Settings", icon: "sliders" },
+    { to: "/effective", label: "Effective Config", icon: "layers", count: d.conflictCount || undefined },
+    { to: "/memory", label: "Memory", icon: "database" },
+  ];
+});
+
+function isActive(item: NavItem): boolean {
+  if (item.to === "/") return route.path === "/";
+  return route.path === item.to || route.path.startsWith((item.match ?? item.to) + "/");
+}
+
+const status = computed(() => {
+  if (scan.scanning) return { tone: "accent" as const, pulse: true, text: "Scanning…" };
+  if (scan.error && !scan.backendAvailable)
+    return { tone: "danger" as const, pulse: false, text: "Backend unavailable" };
+  if (scan.error) return { tone: "warn" as const, pulse: false, text: "Last scan failed" };
+  if (!scan.initialized) return { tone: "neutral" as const, pulse: true, text: "Starting…" };
+  return {
+    tone: "ok" as const,
+    pulse: false,
+    text: `Scanned ${relativeTime(scan.lastScanAt)}`,
+  };
+});
+</script>
+
+<template>
+  <aside class="flex h-full w-[212px] shrink-0 flex-col border-r border-line bg-surface">
+    <div class="flex h-11 shrink-0 items-center gap-2 px-3" data-tauri-drag-region>
+      <div
+        class="flex h-5 w-5 items-center justify-center rounded bg-accent/15 text-accent"
+        aria-hidden="true"
+      >
+        <Icon name="eye" :size="13" />
+      </div>
+      <span class="text-[13px] font-semibold tracking-tight">Agent Scope</span>
+    </div>
+
+    <nav class="flex-1 space-y-px overflow-y-auto px-2 pb-2" aria-label="Sections">
+      <RouterLink
+        v-for="item in main"
+        :key="item.to"
+        :to="item.to"
+        class="group flex h-7 items-center gap-2 rounded-md px-2 text-[13px] transition-colors"
+        :class="
+          isActive(item)
+            ? 'bg-elevated text-fg'
+            : 'text-muted hover:bg-elevated/60 hover:text-fg'
+        "
+      >
+        <Icon
+          :name="item.icon"
+          :size="15"
+          :class="isActive(item) ? 'text-accent' : 'text-subtle group-hover:text-muted'"
+        />
+        <span class="flex-1 truncate">{{ item.label }}</span>
+        <span
+          v-if="item.count"
+          class="font-mono text-2xs tabular-nums"
+          :class="isActive(item) ? 'text-muted' : 'text-subtle'"
+        >
+          {{ item.count }}
+        </span>
+      </RouterLink>
+    </nav>
+
+    <div class="shrink-0 space-y-px border-t border-line px-2 py-2">
+      <RouterLink
+        to="/app-settings"
+        class="flex h-7 items-center gap-2 rounded-md px-2 text-[13px] transition-colors"
+        :class="
+          route.path === '/app-settings'
+            ? 'bg-elevated text-fg'
+            : 'text-muted hover:bg-elevated/60 hover:text-fg'
+        "
+      >
+        <Icon name="settings" :size="15" class="text-subtle" />
+        App Settings
+      </RouterLink>
+      <div class="flex items-center justify-between gap-2 px-2 pt-1.5 text-2xs text-subtle">
+        <span class="flex min-w-0 items-center gap-1.5" :title="scan.error ?? undefined">
+          <StatusDot :tone="status.tone" :pulse="status.pulse" />
+          <span class="truncate">{{ status.text }}</span>
+        </span>
+        <RouterLink to="/app-settings" class="font-mono hover:text-fg" title="App settings">
+          v{{ scan.appInfo?.version ?? "0.1.0" }}
+        </RouterLink>
+      </div>
+    </div>
+  </aside>
+</template>
