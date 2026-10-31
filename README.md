@@ -1,7 +1,7 @@
 # Agent Scope
 
 <p align="center">
-  <img src="src-tauri/icons/128x128.png" width="96" height="96" alt="Agent Scope">
+  <img src="docs/assets/app-icon.png" width="96" height="96" alt="Agent Scope">
 </p>
 
 <p align="center">
