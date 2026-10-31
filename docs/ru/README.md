@@ -81,6 +81,24 @@ brew install --cask agent-scope
 
 Запусти установщик и открой **Agent Scope** из меню «Пуск».
 
+### Linux
+
+**Требования:** x64 или ARM64 · WebKitGTK 4.1 (Debian/Ubuntu 22.04+, Fedora и аналоги)
+
+Скачай пакеты под свой процессор со страницы [GitHub Releases](https://github.com/NejaTive/agent-scope/releases):
+
+| Формат | Файлы | Примечание |
+| --- | --- | --- |
+| AppImage | `Agent.Scope_*_x64.AppImage` / `*_aarch64.AppImage` | `chmod +x` и запуск |
+| deb | `Agent.Scope_*_x64.deb` / `*_aarch64.deb` | Debian, Ubuntu, Mint |
+| rpm | `Agent.Scope_*_x64.rpm` / `*_aarch64.rpm` | Fedora, RHEL, openSUSE |
+
+Пример (deb):
+
+```bash
+sudo apt install ./Agent.Scope_*_x64.deb
+```
+
 ## Возможности
 
 ### Единый обзор AI-инструментов
@@ -159,7 +177,7 @@ Agent Scope — локальное десктопное приложение.
 brew upgrade --cask agent-scope
 ```
 
-- **Windows / macOS (вручную):** скачай новый установщик или DMG со страницы [GitHub Releases](https://github.com/NejaTive/agent-scope/releases).
+- **Windows / Linux / macOS (вручную):** скачай новый установщик со страницы [GitHub Releases](https://github.com/NejaTive/agent-scope/releases).
 
 ## Ограничения
 
@@ -209,7 +227,7 @@ cargo test
 npm run build
 ```
 
-Сборка десктопного приложения (DMG на macOS, NSIS на Windows):
+Сборка десктопного приложения (DMG / NSIS / AppImage+deb+rpm в зависимости от ОС):
 
 ```bash
 npm run tauri:build
@@ -221,11 +239,18 @@ npm run tauri:build
 src-tauri/target/release/bundle/
 ```
 
-Пример сборки под Windows-таргеты:
+На Linux сначала поставь WebKitGTK 4.1 и зависимости бандлера (пример для Debian/Ubuntu):
+
+```bash
+sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf rpm
+```
+
+Примеры кросс-таргетов:
 
 ```bash
 npm run tauri:build -- --target x86_64-pc-windows-msvc
 npm run tauri:build -- --target aarch64-pc-windows-msvc
+npm run tauri:build -- --target x86_64-unknown-linux-gnu --bundles appimage,deb,rpm
 ```
 
 ## Документация

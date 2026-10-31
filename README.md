@@ -81,6 +81,24 @@ Download the NSIS installer for your CPU from [GitHub Releases](https://github.c
 
 Run the installer and launch **Agent Scope** from the Start menu.
 
+### Linux
+
+**Requirements:** x64 or ARM64 · WebKitGTK 4.1 (Debian/Ubuntu 22.04+, Fedora, and similar)
+
+Download packages for your CPU from [GitHub Releases](https://github.com/NejaTive/agent-scope/releases):
+
+| Format | Files | Notes |
+| --- | --- | --- |
+| AppImage | `Agent.Scope_*_x64.AppImage` / `*_aarch64.AppImage` | `chmod +x` then run |
+| deb | `Agent.Scope_*_x64.deb` / `*_aarch64.deb` | Debian, Ubuntu, Mint |
+| rpm | `Agent.Scope_*_x64.rpm` / `*_aarch64.rpm` | Fedora, RHEL, openSUSE |
+
+Example (deb):
+
+```bash
+sudo apt install ./Agent.Scope_*_x64.deb
+```
+
 ## Features
 
 ### Unified AI tooling overview
@@ -159,7 +177,7 @@ Agent Scope is a local desktop app.
 brew upgrade --cask agent-scope
 ```
 
-- **Windows / macOS (manual):** download the newest installer or DMG from [GitHub Releases](https://github.com/NejaTive/agent-scope/releases).
+- **Windows / Linux / macOS (manual):** download the newest installer from [GitHub Releases](https://github.com/NejaTive/agent-scope/releases).
 
 ## Limitations
 
@@ -209,7 +227,7 @@ Build the frontend:
 npm run build
 ```
 
-Build the desktop app (DMG on macOS, NSIS on Windows):
+Build the desktop app (DMG / NSIS / AppImage+deb+rpm depending on host OS):
 
 ```bash
 npm run tauri:build
@@ -221,11 +239,18 @@ Built installers and other artifacts are under:
 src-tauri/target/release/bundle/
 ```
 
-Cross-target Windows example:
+On Linux, install WebKitGTK 4.1 and bundler deps first (Debian/Ubuntu example):
+
+```bash
+sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf rpm
+```
+
+Cross-target examples:
 
 ```bash
 npm run tauri:build -- --target x86_64-pc-windows-msvc
 npm run tauri:build -- --target aarch64-pc-windows-msvc
+npm run tauri:build -- --target x86_64-unknown-linux-gnu --bundles appimage,deb,rpm
 ```
 
 ## Documentation

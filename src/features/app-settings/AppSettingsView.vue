@@ -350,7 +350,10 @@ async function openRelease() {
             <code class="font-mono text-muted">brew upgrade --cask agent-scope</code>
           </p>
           <p
-            v-else-if="updates.updateAvailable && scan.appInfo?.platform === 'windows'"
+            v-else-if="
+              updates.updateAvailable &&
+              (scan.appInfo?.platform === 'windows' || scan.appInfo?.platform === 'linux')
+            "
             class="text-2xs text-subtle"
           >
             Скачай новый установщик с страницы релиза.

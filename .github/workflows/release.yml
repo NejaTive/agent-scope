@@ -1,4 +1,4 @@
-# Release macOS DMG + Windows NSIS installers on version tags (v*).
+# Release macOS DMG + Windows NSIS + Linux AppImage/deb/rpm on version tags (v*).
 #
 # Optional Apple signing / notarization secrets (repo Settings → Secrets).
 # Without them the macOS job still builds an unsigned/ad-hoc DMG.
@@ -10,6 +10,10 @@
 #
 # Windows builds ship unsigned NSIS installers (x64 + ARM64). Authenticode
 # signing can be added later via secrets without changing the job layout.
+#
+# Linux builds ship AppImage + deb + rpm for x64 (ubuntu-22.04) and ARM64
+# (ubuntu-24.04-arm). ubuntu-22.04 keeps a lower glibc baseline for broader
+# distro compatibility on x64.
 
 name: Release
 
@@ -47,6 +51,8 @@ jobs:
             | macOS Apple Silicon | `Agent.Scope_${{ steps.meta.outputs.version }}_aarch64.dmg` |
             | Windows x64 | `Agent.Scope_${{ steps.meta.outputs.version }}_x64-setup.exe` |
             | Windows ARM64 | `Agent.Scope_${{ steps.meta.outputs.version }}_aarch64-setup.exe` |
+            | Linux x64 | `Agent.Scope_${{ steps.meta.outputs.version }}_x64.AppImage` / `.deb` / `.rpm` |
+            | Linux ARM64 | `Agent.Scope_${{ steps.meta.outputs.version }}_aarch64.AppImage` / `.deb` / `.rpm` |
 
             **macOS (Homebrew)** — after updating the tap cask `sha256` / `version`:
             ```bash
@@ -57,6 +63,9 @@ jobs:
             **Windows** — download the NSIS installer for your CPU architecture from
             the assets below. WebView2 is required (included with Windows 10/11 in
             most cases; the installer can bootstrap it when missing).
+
+            **Linux** — prefer `.deb` (Debian/Ubuntu) or `.rpm` (Fedora/RHEL); use
+            AppImage for a portable binary (`chmod +x` then run). Needs WebKitGTK 4.1.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -261,5 +270,120 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           files: ${{ steps.nsis.outputs.path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release-linux:
+    needs: prepare-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Older glibc baseline for wider distro reach on x64.
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            arch: x64
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            arch: aarch64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            xdg-utils \
+            rpm \
+            libfuse2
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Setup Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Build Tauri app (AppImage, deb, rpm)
+        run: npm run tauri:build -- --target ${{ matrix.target }} --bundles appimage,deb,rpm
+
+      - name: Locate Linux bundles, checksum, stabilize filenames
+        id: linux
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          ARCH="${{ matrix.arch }}"
+          TARGET="${{ matrix.target }}"
+          BUNDLE_DIR="src-tauri/target/${TARGET}/release/bundle"
+          OUT_DIR="${BUNDLE_DIR}/release-assets"
+          mkdir -p "${OUT_DIR}"
+
+          echo "Looking for Linux bundles under ${BUNDLE_DIR}..."
+          if [ ! -d "${BUNDLE_DIR}" ]; then
+            echo "::error::Bundle directory missing: ${BUNDLE_DIR}"
+            ls -laR src-tauri/target || true
+            exit 1
+          fi
+
+          find_one() {
+            local pattern="$1"
+            local found
+            found="$(find "${BUNDLE_DIR}" -type f -name "${pattern}" ! -path '*/release-assets/*' | head -n 1 || true)"
+            if [ -z "${found}" ]; then
+              echo "::error::No file matching ${pattern} under ${BUNDLE_DIR}"
+              ls -laR "${BUNDLE_DIR}" || true
+              exit 1
+            fi
+            echo "${found}"
+          }
+
+          APPIMAGE_SRC="$(find_one '*.AppImage')"
+          DEB_SRC="$(find_one '*.deb')"
+          RPM_SRC="$(find_one '*.rpm')"
+
+          APPIMAGE_NAME="Agent.Scope_${VERSION}_${ARCH}.AppImage"
+          DEB_NAME="Agent.Scope_${VERSION}_${ARCH}.deb"
+          RPM_NAME="Agent.Scope_${VERSION}_${ARCH}.rpm"
+
+          cp "${APPIMAGE_SRC}" "${OUT_DIR}/${APPIMAGE_NAME}"
+          cp "${DEB_SRC}" "${OUT_DIR}/${DEB_NAME}"
+          cp "${RPM_SRC}" "${OUT_DIR}/${RPM_NAME}"
+
+          {
+            echo "## Linux ${ARCH}"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for f in "${APPIMAGE_NAME}" "${DEB_NAME}" "${RPM_NAME}"; do
+            p="${OUT_DIR}/${f}"
+            sha="$(sha256sum "${p}" | awk '{print $1}')"
+            echo "- **Asset:** \`${f}\` — sha256 \`${sha}\`" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          echo "dir=${OUT_DIR}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Linux bundles
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: ${{ steps.linux.outputs.dir }}/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
