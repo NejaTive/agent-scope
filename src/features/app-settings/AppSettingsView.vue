@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
+import { useUpdatesStore } from "@/stores/updates";
 import { shortenPath } from "@/lib/format";
 import type { ThemePreference } from "@/types/config";
 import Badge from "@/components/common/Badge.vue";
@@ -8,12 +10,56 @@ import Icon from "@/components/common/Icon.vue";
 
 const prefs = usePreferencesStore();
 const scan = useScanStore();
+const updates = useUpdatesStore();
 
 const THEMES: Array<{ value: ThemePreference; label: string }> = [
   { value: "dark", label: "Тёмная" },
   { value: "light", label: "Светлая" },
   { value: "system", label: "Системная" },
 ];
+
+const statusText = computed(() => {
+  switch (updates.status) {
+    case "checking":
+      return "Проверка…";
+    case "up-to-date":
+      return "Установлена актуальная версия";
+    case "update-available":
+      return updates.latestVersion
+        ? `Доступна версия ${updates.latestVersion}`
+        : "Доступна новая версия";
+    case "error":
+      return updates.error
+        ? `Не удалось проверить обновления: ${updates.error}`
+        : "Не удалось проверить обновления";
+    default:
+      return null;
+  }
+});
+
+const statusTone = computed(() => {
+  switch (updates.status) {
+    case "up-to-date":
+      return "text-ok";
+    case "update-available":
+      return "text-accent";
+    case "error":
+      return "text-warn";
+    default:
+      return "text-muted";
+  }
+});
+
+async function openRelease() {
+  const url = updates.releaseUrl;
+  if (!url || !/^https?:/i.test(url)) return;
+  try {
+    const { openUrl } = await import("@tauri-apps/plugin-opener");
+    await openUrl(url);
+  } catch {
+    /* opener unavailable (browser dev) */
+  }
+}
 </script>
 
 <template>
@@ -122,7 +168,7 @@ const THEMES: Array<{ value: ThemePreference; label: string }> = [
           <dt class="text-subtle">Название</dt>
           <dd>{{ scan.appInfo?.name ?? "Agent Scope" }}</dd>
           <dt class="text-subtle">Версия</dt>
-          <dd class="font-mono">{{ scan.appInfo?.version ?? "0.3.0" }}</dd>
+          <dd class="font-mono">{{ scan.appInfo?.version ?? "0.3.1" }}</dd>
           <template v-if="scan.globalMeta.configDir">
             <dt class="text-subtle">Каталог Claude Code</dt>
             <dd class="break-all font-mono">{{ shortenPath(scan.globalMeta.configDir) }}</dd>
@@ -142,6 +188,35 @@ const THEMES: Array<{ value: ThemePreference; label: string }> = [
             </Badge>
           </dd>
         </dl>
+        <div class="card mt-2 space-y-2 px-3 py-2.5">
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              class="btn"
+              :disabled="updates.status === 'checking'"
+              @click="updates.check()"
+            >
+              <Icon name="refresh" :size="12" :class="updates.status === 'checking' && 'animate-spin'" />
+              Проверить обновления
+            </button>
+            <button
+              v-if="updates.updateAvailable && updates.releaseUrl"
+              type="button"
+              class="btn-ghost"
+              @click="openRelease"
+            >
+              Открыть релиз
+            </button>
+          </div>
+          <p v-if="statusText" class="text-xs" :class="statusTone">{{ statusText }}</p>
+          <p
+            v-if="updates.updateAvailable"
+            class="text-2xs text-subtle"
+          >
+            Через Homebrew:
+            <code class="font-mono text-muted">brew upgrade --cask agent-scope</code>
+          </p>
+        </div>
         <p class="mt-2 flex items-center gap-1.5 text-2xs text-subtle">
           <Icon name="lock" :size="11" />
           По умолчанию — просмотр. Запись / rename / delete — opt-in и только для существующих файлов из

@@ -8,6 +8,7 @@ use crate::paths::language_for;
 use crate::resolver;
 use crate::scanner::{self, discovery};
 use crate::state::{self, AppState};
+use crate::updates;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, State};
@@ -40,6 +41,13 @@ fn validate_dir(path: &str) -> AppResult<PathBuf> {
 #[tauri::command]
 pub fn get_app_info() -> AppInfo {
     AppInfo { name: "Agent Scope".into(), version: env!("CARGO_PKG_VERSION").into() }
+}
+
+/// Query GitHub Releases for a newer version. Soft errors are returned in the
+/// result's `error` field rather than as an IPC failure.
+#[tauri::command]
+pub async fn check_for_updates() -> Result<UpdateCheckResult, AppError> {
+    spawn_blocking(|| Ok(updates::check_for_updates(env!("CARGO_PKG_VERSION")))).await
 }
 
 #[tauri::command]

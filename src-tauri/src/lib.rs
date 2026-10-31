@@ -10,6 +10,7 @@ pub mod resolver;
 pub mod scanner;
 pub mod state;
 pub mod storage;
+pub mod updates;
 pub mod watcher;
 
 use state::AppState;
@@ -39,6 +40,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_app_info,
+            commands::check_for_updates,
             commands::get_dashboard,
             commands::run_scan,
             commands::list_scan_roots,

@@ -338,6 +338,17 @@ export interface AppInfo {
   version: string;
 }
 
+/** Result of `check_for_updates` (GitHub latest release vs installed version). */
+export interface UpdateCheckResult {
+  currentVersion: string;
+  latestVersion: string | null;
+  updateAvailable: boolean;
+  releaseUrl: string | null;
+  releaseNotes?: string | null;
+  checkedAt: string;
+  error?: string | null;
+}
+
 export interface Preferences {
   theme: ThemePreference;
   watchOnStart: boolean;

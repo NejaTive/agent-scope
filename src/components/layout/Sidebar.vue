@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { useScanStore } from "@/stores/scan";
+import { useUpdatesStore } from "@/stores/updates";
 import { relativeTime } from "@/lib/format";
 import Icon, { type IconName } from "@/components/common/Icon.vue";
 import StatusDot from "@/components/common/StatusDot.vue";
@@ -16,6 +17,7 @@ interface NavItem {
 }
 
 const scan = useScanStore();
+const updates = useUpdatesStore();
 const route = useRoute();
 
 const main = computed<NavItem[]>(() => {
@@ -112,13 +114,22 @@ const status = computed(() => {
         <Icon name="settings" :size="15" class="text-subtle" />
         Настройки приложения
       </RouterLink>
+      <RouterLink
+        v-if="updates.updateAvailable && updates.latestVersion"
+        to="/app-settings"
+        class="mx-0.5 flex h-6 items-center gap-1.5 truncate rounded-md bg-accent/10 px-2 text-2xs text-accent transition-colors hover:bg-accent/15"
+        :title="`Доступна версия ${updates.latestVersion}`"
+      >
+        <Icon name="inbox" :size="11" class="shrink-0" />
+        <span class="truncate">Обновление {{ updates.latestVersion }}</span>
+      </RouterLink>
       <div class="flex items-center justify-between gap-2 px-2 pt-1.5 text-2xs text-subtle">
         <span class="flex min-w-0 items-center gap-1.5" :title="scan.error ?? undefined">
           <StatusDot :tone="status.tone" :pulse="status.pulse" />
           <span class="truncate">{{ status.text }}</span>
         </span>
         <RouterLink to="/app-settings" class="font-mono hover:text-fg" title="Настройки приложения">
-          v{{ scan.appInfo?.version ?? "0.3.0" }}
+          v{{ scan.appInfo?.version ?? "0.3.1" }}
         </RouterLink>
       </div>
     </div>

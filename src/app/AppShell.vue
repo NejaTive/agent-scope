@@ -4,6 +4,7 @@ import { RouterView, useRoute } from "vue-router";
 import { useScanStore } from "@/stores/scan";
 import { usePreferencesStore } from "@/stores/preferences";
 import { useUiStore } from "@/stores/ui";
+import { useUpdatesStore } from "@/stores/updates";
 import Sidebar from "@/components/layout/Sidebar.vue";
 import AppHeader from "@/components/layout/AppHeader.vue";
 import Icon from "@/components/common/Icon.vue";
@@ -11,6 +12,7 @@ import Icon from "@/components/common/Icon.vue";
 const scan = useScanStore();
 const prefs = usePreferencesStore();
 const ui = useUiStore();
+const updates = useUpdatesStore();
 const route = useRoute();
 
 // Clear the header search when switching sections.
@@ -25,6 +27,8 @@ onMounted(async () => {
   // Toggling the preference later starts/stops the watcher from the preferences store.
   if (prefs.prefs.watchOnStart) void prefs.applyWatching(true);
   await scan.init(true);
+  // Quiet once-per-session update check — failures stay silent (no banner/modal).
+  void updates.checkQuiet();
 });
 
 onBeforeUnmount(() => scan.stopListening());

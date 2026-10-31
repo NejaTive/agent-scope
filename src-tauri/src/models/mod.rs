@@ -533,6 +533,20 @@ pub struct AppInfo {
     pub version: String,
 }
 
+/// Result of checking GitHub Releases for a newer app version.
+/// Soft failures populate `error` instead of failing the IPC call.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateCheckResult {
+    pub current_version: String,
+    pub latest_version: Option<String>,
+    pub update_available: bool,
+    pub release_url: Option<String>,
+    pub release_notes: Option<String>,
+    pub checked_at: String,
+    pub error: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Preferences {

@@ -17,6 +17,7 @@ import type {
   SaveArtifactResult,
   SearchFilters,
   SettingsDiff,
+  UpdateCheckResult,
 } from "@/types/config";
 
 /** True when running inside the Tauri webview (false in plain `vite dev`). */
@@ -125,6 +126,8 @@ export const ipc = {
   getPreferences: () => call<Preferences>("get_preferences"),
   setPreferences: (prefs: Preferences) =>
     call<Preferences>("set_preferences", { prefs }),
+
+  checkForUpdates: () => call<UpdateCheckResult>("check_for_updates"),
 };
 
 export const CONFIG_CHANGED_EVENT = "config-changed";
