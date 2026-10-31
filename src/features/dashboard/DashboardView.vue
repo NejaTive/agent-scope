@@ -5,6 +5,7 @@ import { useScanStore } from "@/stores/scan";
 import { useUiStore } from "@/stores/ui";
 import { formatTime, relativeTime, shortenPath } from "@/lib/format";
 import { PRODUCT_LABEL, resolveProduct } from "@/lib/labels";
+import { RU, pluralCount } from "@/lib/plural";
 import Badge from "@/components/common/Badge.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import ScopeBadge from "@/components/common/ScopeBadge.vue";
@@ -40,7 +41,6 @@ const cards = computed(() => {
     { label: "Плагины", value: d.plugins, to: "/plugins" },
     { label: "Команды", value: d.commands, to: "/skills" },
     { label: "Файлы памяти", value: d.memories, to: "/memory" },
-    { label: "Конфликты", value: d.conflictCount, to: "/effective", warn: d.conflictCount > 0 },
   ];
 });
 
@@ -68,14 +68,14 @@ const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
       <section class="flex flex-wrap items-center gap-2 text-xs text-muted">
         <Badge tone="info">{{ PRODUCT_LABEL.claude }}</Badge>
         <span>
-          {{ productStats.claude }} артефактов · {{ productStats.withClaude }} проектов с
-          <span class="font-mono">.claude</span>
+          {{ pluralCount(productStats.claude, RU.artifact) }} ·
+          {{ pluralCount(productStats.withClaude, RU.project) }}
         </span>
         <span class="text-subtle">·</span>
         <Badge tone="accent">{{ PRODUCT_LABEL.cursor }}</Badge>
         <span>
-          {{ productStats.cursor }} артефактов · {{ productStats.withCursor }} проектов с
-          <span class="font-mono">.cursor</span>
+          {{ pluralCount(productStats.cursor, RU.artifact) }} ·
+          {{ pluralCount(productStats.withCursor, RU.project) }}
         </span>
       </section>
 
@@ -89,10 +89,7 @@ const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
             @click="router.push(c.to)"
           >
             <div class="label">{{ c.label }}</div>
-            <div
-              class="mt-1 font-mono text-2xl font-semibold tabular-nums"
-              :class="c.warn ? 'text-warn' : 'text-fg'"
-            >
+            <div class="mt-1 font-mono text-2xl font-semibold tabular-nums text-fg">
               {{ c.value }}
             </div>
           </button>

@@ -66,7 +66,7 @@ const productCounts = computed(() => {
         :loading="!scan.initialized"
         kind-filter
         show-kind
-        empty-title="Глобальная конфигурация не найдена"
+        empty-title="Глобальные не найдены"
         empty-description="Ничего не обнаружено в ~/.claude, ~/.cursor или управляемых каталогах. Запустите сканирование для обновления."
       />
     </div>

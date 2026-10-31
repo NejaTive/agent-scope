@@ -7,7 +7,7 @@ import { useUiStore } from "@/stores/ui";
 import { artifactToItem, type BrowserItem } from "@/lib/browser";
 import { shortenPath } from "@/lib/format";
 import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
-import Badge from "@/components/common/Badge.vue";
+import ProductBadge from "@/components/common/ProductBadge.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import Icon from "@/components/common/Icon.vue";
 import SettingsDiffPanel from "@/features/settings/SettingsDiffPanel.vue";
@@ -90,10 +90,14 @@ const items = computed<BrowserItem[]>(() => {
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2">
           <span class="truncate text-[13px] font-semibold">{{ project.name }}</span>
-          <Badge v-if="project.pinned" tone="accent">закреплён</Badge>
-          <Badge v-if="project.hasClaudeDir" mono tone="info">.claude</Badge>
-          <Badge v-if="project.hasCursorDir" mono tone="accent">.cursor</Badge>
-          <Badge v-if="!project.hasClaudeDir && !project.hasCursorDir">нет .claude / .cursor</Badge>
+          <ProductBadge
+            v-if="project.hasClaudeDir || project.hasClaudeMd || project.hasMcpJson"
+            product="claude"
+          />
+          <ProductBadge
+            v-if="project.hasCursorDir || project.hasCursorMcpJson"
+            product="cursor"
+          />
         </div>
         <div class="truncate font-mono text-2xs text-subtle" :title="project.path">
           {{ shortenPath(project.path) }}

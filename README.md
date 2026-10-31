@@ -11,7 +11,6 @@
 - Сканирует `~/.claude` (или `CLAUDE_CONFIG_DIR`), `~/.cursor` и управляемые пути macOS
 - Находит проекты в выбранных корнях (или добавляет проект вручную)
 - Показывает Skills, Commands, Rules, Agents, Hooks, MCP, Plugins, Settings, Memory (`AGENTS.md`, `SKILL.md` и др.)
-- Показывает эффективную конфигурацию с явной уверенностью (`computed` / `inferred` / `unknown`)
 - Обнаруживает конфликты (дубли имён, расхождения MCP, переопределения настроек)
 - Отслеживает файлы конфигурации и показывает недавние изменения
 - По желанию правит / переименовывает / удаляет **существующие** файлы из allowlist (markdown rules/skills/commands/agents/memory, JSON settings/MCP/hooks) — см. ниже
@@ -24,9 +23,9 @@
 4. Delete — один файл (без рекурсии каталогов); из приложения не откатывается.
 5. В режиме правки секреты **не маскируются**. Не сохраняйте замаскированный просмотр с `***`.
 6. После save бэкенд возвращает предыдущий текст для одноуровневого undo в UI; `.bak` на диск **не** пишется. Undo для rename/delete нет.
-7. Effective Config / diff / resolved settings — **только просмотр**.
+7. Diff настроек по областям — **только просмотр**.
 
-Не трогаются: `.credentials.json`, `~/.claude.json`, managed/system пути, файлы вне allowlist. Не в MVP: создание артефактов с нуля, GUI-формы settings, merge effective config, запуск hooks/MCP.
+Не трогаются: `.credentials.json`, `~/.claude.json`, managed/system пути, файлы вне allowlist. Не в MVP: создание артефактов с нуля, GUI-формы settings, запуск hooks/MCP.
 
 ## Чего не делает
 

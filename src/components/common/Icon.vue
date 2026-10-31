@@ -31,7 +31,8 @@ export type IconName =
   | "eye"
   | "lock"
   | "copy"
-  | "inbox";
+  | "inbox"
+  | "more";
 
 const PATHS: Record<IconName, string> = {
   dashboard:
@@ -78,6 +79,7 @@ const PATHS: Record<IconName, string> = {
   copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
   inbox:
     '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
 };
 
 const props = withDefaults(defineProps<{ name: IconName; size?: number }>(), {

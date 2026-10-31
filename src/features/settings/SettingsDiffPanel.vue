@@ -4,6 +4,7 @@ import { useInvoke } from "@/composables/useInvoke";
 import { matchesQuery } from "@/composables/useSearch";
 import { ipc } from "@/lib/ipc";
 import { formatValue, shortenPath } from "@/lib/format";
+import { RU, pluralCount } from "@/lib/plural";
 import { maskIfSecret } from "@/lib/secrets";
 import type { SettingsDiff, SettingsDiffRow } from "@/types/config";
 import { useScanStore } from "@/stores/scan";
@@ -60,7 +61,7 @@ function columnPath(c: (typeof COLUMNS)[number]): string | null {
   <section>
     <div class="mb-2 flex items-center gap-2">
       <h2 class="label">Diff настроек по областям</h2>
-      <span class="font-mono text-2xs text-subtle">{{ rows.length }} ключей</span>
+      <span class="font-mono text-2xs text-subtle">{{ pluralCount(rows.length, RU.key) }}</span>
     </div>
     <LoadingBlock v-if="diff.loading.value && !diff.data.value" :lines="4" />
     <div v-else-if="diff.error.value" class="card h-40">

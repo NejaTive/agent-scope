@@ -69,7 +69,8 @@ async function openRelease() {
         v-if="prefs.error"
         class="rounded-md border border-warn/30 bg-warn/10 px-3 py-1.5 text-xs text-warn"
       >
-        Не удалось синхронизировать настройки с бэкендом ({{ prefs.error }}). Изменения сохранены локально.
+        Не удалось синхронизировать настройки с бэкендом ({{ prefs.error }}).
+        Изменения сохранены локально.
       </div>
 
       <section>
@@ -77,9 +78,13 @@ async function openRelease() {
         <div class="card flex items-center justify-between gap-4 px-3 py-2.5">
           <div>
             <div class="text-[13px] font-medium">Тема</div>
-            <div class="text-xs text-muted">По умолчанию — тёмная. Системная следует за настройкой ОС.</div>
+            <div class="text-xs text-muted">
+              По умолчанию — тёмная. Системная следует за настройкой ОС.
+            </div>
           </div>
-          <div class="flex items-center gap-0.5 rounded-md border border-line p-0.5">
+          <div
+            class="flex items-center gap-0.5 rounded-md border border-line p-0.5"
+          >
             <button
               v-for="t in THEMES"
               :key="t.value"
@@ -97,11 +102,16 @@ async function openRelease() {
       <section>
         <h2 class="label mb-2">Сканирование</h2>
         <div class="card divide-y divide-line">
-          <label class="flex cursor-pointer items-center justify-between gap-4 px-3 py-2.5">
+          <label
+            class="flex cursor-pointer items-center justify-between gap-4 px-3 py-2.5"
+          >
             <div>
-              <div class="text-[13px] font-medium">Отслеживать изменения файлов при запуске</div>
+              <div class="text-[13px] font-medium">
+                Отслеживать изменения файлов при запуске
+              </div>
               <div class="text-xs text-muted">
-                Автоматическое мягкое обновление при изменении конфигурации Claude Code и Cursor на диске. Переключение сразу запускает или
+                Автоматическое мягкое обновление при изменении конфигурации
+                Claude Code и Cursor на диске. Переключение сразу запускает или
                 останавливает наблюдатель.
               </div>
             </div>
@@ -109,30 +119,50 @@ async function openRelease() {
               type="checkbox"
               class="h-3.5 w-3.5 accent-[rgb(var(--accent))]"
               :checked="prefs.prefs.watchOnStart"
-              @change="prefs.update({ watchOnStart: ($event.target as HTMLInputElement).checked })"
+              @change="
+                prefs.update({
+                  watchOnStart: ($event.target as HTMLInputElement).checked,
+                })
+              "
             />
           </label>
-          <label class="flex cursor-pointer items-center justify-between gap-4 px-3 py-2.5">
+          <label
+            class="flex cursor-pointer items-center justify-between gap-4 px-3 py-2.5"
+          >
             <div>
               <div class="text-[13px] font-medium">Уведомления</div>
-              <div class="text-xs text-muted">Уведомлять об изменении конфигурации Claude Code и Cursor на диске.</div>
+              <div class="text-xs text-muted">
+                Уведомлять об изменении конфигурации Claude Code и Cursor на
+                диске.
+              </div>
             </div>
             <input
               type="checkbox"
               class="h-3.5 w-3.5 accent-[rgb(var(--accent))]"
               :checked="prefs.prefs.notifications"
-              @change="prefs.update({ notifications: ($event.target as HTMLInputElement).checked })"
+              @change="
+                prefs.update({
+                  notifications: ($event.target as HTMLInputElement).checked,
+                })
+              "
             />
           </label>
           <div class="px-3 py-2.5">
             <div class="mb-1 text-[13px] font-medium">Корни сканирования</div>
             <ul v-if="scan.scanRoots.length" class="space-y-0.5">
-              <li v-for="r in scan.scanRoots" :key="r.path" class="font-mono text-[11.5px] text-muted">
+              <li
+                v-for="r in scan.scanRoots"
+                :key="r.path"
+                class="font-mono text-[11.5px] text-muted"
+              >
                 {{ shortenPath(r.path) }}
               </li>
             </ul>
             <p v-else class="text-xs text-muted">Не заданы.</p>
-            <RouterLink to="/projects" class="mt-1.5 inline-block text-xs text-accent hover:underline">
+            <RouterLink
+              to="/projects"
+              class="mt-1.5 inline-block text-xs text-accent hover:underline"
+            >
               Управление на странице «Проекты» →
             </RouterLink>
           </div>
@@ -142,21 +172,28 @@ async function openRelease() {
       <section>
         <h2 class="label mb-2">Редактирование</h2>
         <div class="card divide-y divide-line">
-          <label class="flex cursor-pointer items-center justify-between gap-4 px-3 py-2.5">
+          <label
+            class="flex cursor-pointer items-center justify-between gap-4 px-3 py-2.5"
+          >
             <div>
-              <div class="text-[13px] font-medium">Разрешить редактирование файлов конфигурации</div>
+              <div class="text-[13px] font-medium">
+                Разрешить редактирование файлов конфигурации
+              </div>
               <div class="text-xs text-muted">
-                По умолчанию выключено. Включает правку, переименование (в той же папке) и удаление
-                существующих файлов из allowlist (rules, skills, settings, MCP, hooks и т.п.). Создание
-                новых артефактов с нуля не поддерживается. Effective Config — только просмотр. В режиме
-                правки секреты не маскируются.
+                Включает редактирование, переименование и удаление существующих файлов.
+                <br />
+                <b> В режиме правки секреты не маскируются.</b>
               </div>
             </div>
             <input
               type="checkbox"
               class="h-3.5 w-3.5 shrink-0 accent-[rgb(var(--accent))]"
               :checked="prefs.prefs.allowEditing"
-              @change="prefs.update({ allowEditing: ($event.target as HTMLInputElement).checked })"
+              @change="
+                prefs.update({
+                  allowEditing: ($event.target as HTMLInputElement).checked,
+                })
+              "
             />
           </label>
         </div>
@@ -164,22 +201,30 @@ async function openRelease() {
 
       <section>
         <h2 class="label mb-2">О приложении</h2>
-        <dl class="card grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 px-3 py-2.5 text-xs">
+        <dl
+          class="card grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 px-3 py-2.5 text-xs"
+        >
           <dt class="text-subtle">Название</dt>
           <dd>{{ scan.appInfo?.name ?? "Agent Scope" }}</dd>
           <dt class="text-subtle">Версия</dt>
-          <dd class="font-mono">{{ scan.appInfo?.version ?? "0.3.1" }}</dd>
+          <dd class="font-mono">{{ scan.appInfo?.version ?? "0.3.2" }}</dd>
           <template v-if="scan.globalMeta.configDir">
             <dt class="text-subtle">Каталог Claude Code</dt>
-            <dd class="break-all font-mono">{{ shortenPath(scan.globalMeta.configDir) }}</dd>
+            <dd class="break-all font-mono">
+              {{ shortenPath(scan.globalMeta.configDir) }}
+            </dd>
           </template>
           <template v-if="scan.globalMeta.cursorConfigDir">
             <dt class="text-subtle">Каталог Cursor</dt>
-            <dd class="break-all font-mono">{{ shortenPath(scan.globalMeta.cursorConfigDir) }}</dd>
+            <dd class="break-all font-mono">
+              {{ shortenPath(scan.globalMeta.cursorConfigDir) }}
+            </dd>
           </template>
           <template v-if="scan.globalMeta.managedDir">
             <dt class="text-subtle">Управляемый каталог</dt>
-            <dd class="break-all font-mono">{{ shortenPath(scan.globalMeta.managedDir) }}</dd>
+            <dd class="break-all font-mono">
+              {{ shortenPath(scan.globalMeta.managedDir) }}
+            </dd>
           </template>
           <dt class="text-subtle">Бэкенд</dt>
           <dd>
@@ -219,8 +264,9 @@ async function openRelease() {
         </div>
         <p class="mt-2 flex items-center gap-1.5 text-2xs text-subtle">
           <Icon name="lock" :size="11" />
-          По умолчанию — просмотр. Запись / rename / delete — opt-in и только для существующих файлов из
-          allowlist; credentials и пути вне списка не трогаются.
+          По умолчанию — просмотр. Запись / rename / delete — opt-in и только
+          для существующих файлов из allowlist; credentials и пути вне списка не
+          трогаются.
         </p>
       </section>
     </div>

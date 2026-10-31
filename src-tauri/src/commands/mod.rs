@@ -392,22 +392,6 @@ pub async fn delete_artifact(
 // ---------------------------------------------------------------- settings & conflicts
 
 #[tauri::command]
-pub async fn get_effective_settings(
-    project_path: Option<String>,
-    state: State<'_, AppState>,
-) -> Result<Vec<ResolvedSetting>, AppError> {
-    let st = state.inner().clone();
-    spawn_blocking(move || {
-        let project = match &project_path {
-            Some(p) => Some(st.project_bundle(p)?),
-            None => None,
-        };
-        st.with_snapshot(|s| resolver::resolve(&resolver::layers_for(&s.global, project.as_ref())))
-    })
-    .await
-}
-
-#[tauri::command]
 pub async fn get_conflicts(state: State<'_, AppState>) -> Result<Vec<Conflict>, AppError> {
     let st = state.inner().clone();
     spawn_blocking(move || st.with_snapshot(|s| s.conflicts.clone())).await

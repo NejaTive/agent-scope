@@ -19,7 +19,7 @@ export const routes: RouteRecordRaw[] = [
     path: "/global",
     name: "global",
     component: () => import("@/features/global/GlobalConfigView.vue"),
-    meta: { title: "Глобальная конфигурация", searchable: true },
+    meta: { title: "Глобальные", searchable: true },
   },
   {
     path: "/projects",
@@ -80,12 +80,6 @@ export const routes: RouteRecordRaw[] = [
     name: "settings",
     component: () => import("@/features/settings/SettingsView.vue"),
     meta: { title: "Настройки", searchable: true },
-  },
-  {
-    path: "/effective",
-    name: "effective",
-    component: () => import("@/features/effective/EffectiveView.vue"),
-    meta: { title: "Эффективная конфигурация", searchable: true },
   },
   {
     path: "/memory",

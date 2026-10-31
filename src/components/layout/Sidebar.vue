@@ -24,7 +24,7 @@ const main = computed<NavItem[]>(() => {
   const d = scan.dashboard;
   return [
     { to: "/", label: "Обзор", icon: "dashboard" },
-    { to: "/global", label: "Глобальная конфигурация", icon: "globe" },
+    { to: "/global", label: "Глобальные", icon: "globe" },
     { to: "/projects", label: "Проекты", icon: "folder", count: d.projectCount, match: "/projects" },
     { to: "/skills", label: "Скиллы", icon: "zap", count: scan.skillEntries.length },
     { to: "/rules", label: "Правила", icon: "file-text", count: d.rules },
@@ -34,7 +34,6 @@ const main = computed<NavItem[]>(() => {
     { to: "/plugins", label: "Плагины", icon: "box", count: d.plugins },
     { to: "/permissions", label: "Права доступа", icon: "shield" },
     { to: "/settings", label: "Настройки", icon: "sliders" },
-    { to: "/effective", label: "Эффективная конфигурация", icon: "layers", count: d.conflictCount || undefined },
     { to: "/memory", label: "Память", icon: "database" },
   ];
 });
@@ -69,7 +68,6 @@ const status = computed(() => {
       </div>
       <div class="min-w-0">
         <div class="text-[13px] font-semibold tracking-tight">Agent Scope</div>
-        <div class="truncate text-2xs text-subtle">Claude Code · Cursor</div>
       </div>
     </div>
 
@@ -129,7 +127,7 @@ const status = computed(() => {
           <span class="truncate">{{ status.text }}</span>
         </span>
         <RouterLink to="/app-settings" class="font-mono hover:text-fg" title="Настройки приложения">
-          v{{ scan.appInfo?.version ?? "0.3.1" }}
+          v{{ scan.appInfo?.version ?? "0.3.2" }}
         </RouterLink>
       </div>
     </div>

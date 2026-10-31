@@ -1,6 +1,5 @@
 import type {
   ArtifactKind,
-  Confidence,
   DiscoveryStatus,
   Product,
   Scope,
@@ -32,7 +31,7 @@ export const SCOPE_LABEL: Record<Scope, string> = {
   projectLocal: "Локальный",
   plugin: "Плагин",
   nested: "Вложенный",
-  globalConfig: "Глобальная конфигурация",
+  globalConfig: "Глобальные",
 };
 
 export const SCOPE_ORDER: Scope[] = [
@@ -107,12 +106,6 @@ export const STATUS_TONE: Record<
   invalidJson: "danger",
   invalidFrontmatter: "warn",
   partial: "warn",
-};
-
-export const CONFIDENCE_LABEL: Record<Confidence, string> = {
-  computed: "Вычислено",
-  inferred: "Выведено",
-  unknown: "Неизвестно",
 };
 
 /** Route for each artifact kind (used by global search). */

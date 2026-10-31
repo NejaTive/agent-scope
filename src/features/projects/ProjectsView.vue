@@ -6,18 +6,28 @@ import { useScanStore } from "@/stores/scan";
 import { useUiStore } from "@/stores/ui";
 import { matchesQuery } from "@/composables/useSearch";
 import { shortenPath } from "@/lib/format";
+import { RU, pluralCount, type RuForms } from "@/lib/plural";
 import type { ProjectInfo } from "@/types/config";
 import Badge from "@/components/common/Badge.vue";
+import ProductBadge from "@/components/common/ProductBadge.vue";
+import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import Icon from "@/components/common/Icon.vue";
 import LoadingBlock from "@/components/common/LoadingBlock.vue";
+
+function hasClaude(p: ProjectInfo) {
+  return p.hasClaudeDir || p.hasClaudeMd || p.hasMcpJson;
+}
+function hasCursor(p: ProjectInfo) {
+  return p.hasCursorDir || p.hasCursorMcpJson;
+}
 
 const scan = useScanStore();
 const router = useRouter();
 const { search } = storeToRefs(useUiStore());
 
-const confirming = ref<string | null>(null);
-const confirmingRoot = ref<string | null>(null);
+const pendingRemove = ref<ProjectInfo | null>(null);
+const pendingRemoveRoot = ref<string | null>(null);
 
 const projects = computed(() =>
   [...scan.projects]
@@ -28,27 +38,30 @@ const projects = computed(() =>
 /** Per-project counts derived from the scan snapshot (ProjectInfo only carries `artifactCount`). */
 function counts(p: ProjectInfo) {
   const own = (e: { projectPath?: string | null }) => e.projectPath === p.path;
-  return [
-    { label: "скиллы", n: scan.skillEntries.filter(own).length },
-    { label: "правила", n: scan.rules.filter(own).length },
-    { label: "агенты", n: scan.agents.filter(own).length },
-    { label: "хуки", n: scan.hooks.filter(own).length },
-    { label: "mcp", n: scan.mcpServers.filter(own).length },
-  ].filter((x) => x.n > 0);
+  const rows: Array<{ key: string; n: number; forms: RuForms }> = [
+    { key: "skill", n: scan.skillEntries.filter(own).length, forms: RU.skill },
+    { key: "rule", n: scan.rules.filter(own).length, forms: RU.rule },
+    { key: "agent", n: scan.agents.filter(own).length, forms: RU.agent },
+    { key: "hook", n: scan.hooks.filter(own).length, forms: RU.hook },
+    { key: "mcp", n: scan.mcpServers.filter(own).length, forms: RU.mcpServer },
+  ];
+  return rows.filter((x) => x.n > 0).map((x) => ({ key: x.key, text: pluralCount(x.n, x.forms) }));
 }
 
 function open(p: ProjectInfo) {
   void router.push({ name: "project-detail", params: { id: encodeURIComponent(p.path) } });
 }
 
-async function remove(p: ProjectInfo) {
-  confirming.value = null;
-  await scan.removeProject(p.path);
+async function confirmRemoveProject() {
+  const p = pendingRemove.value;
+  pendingRemove.value = null;
+  if (p) await scan.removeProject(p.path);
 }
 
-async function removeRoot(path: string) {
-  confirmingRoot.value = null;
-  await scan.removeScanRoot(path);
+async function confirmRemoveRoot() {
+  const path = pendingRemoveRoot.value;
+  pendingRemoveRoot.value = null;
+  if (path) await scan.removeScanRoot(path);
 }
 </script>
 
@@ -80,11 +93,12 @@ async function removeRoot(path: string) {
             <span class="min-w-0 flex-1 truncate font-mono text-[11.5px]" :title="r.path">
               {{ shortenPath(r.path) }}
             </span>
-            <template v-if="confirmingRoot === r.path">
-              <button type="button" class="btn !h-6 text-danger" @click="removeRoot(r.path)">Убрать из списка</button>
-              <button type="button" class="btn-ghost !h-6" @click="confirmingRoot = null">Отмена</button>
-            </template>
-            <button v-else type="button" class="btn-ghost !h-6" title="Убрать корень сканирования из приложения" @click="confirmingRoot = r.path">
+            <button
+              type="button"
+              class="btn-ghost !h-6"
+              title="Убрать корень сканирования из приложения"
+              @click="pendingRemoveRoot = r.path"
+            >
               <Icon name="x" :size="12" />
             </button>
           </li>
@@ -110,40 +124,55 @@ async function removeRoot(path: string) {
             <button type="button" class="flex min-w-0 flex-1 flex-col gap-0.5 text-left" @click="open(p)">
               <span class="flex items-center gap-2">
                 <span class="truncate text-[13px] font-medium">{{ p.name }}</span>
-                <Badge v-if="p.pinned" tone="accent">закреплён</Badge>
-                <Badge v-if="p.discovered && !p.pinned">обнаружен</Badge>
-                <Badge v-if="p.hasClaudeDir" mono tone="info">.claude</Badge>
-                <Badge v-if="p.hasCursorDir" mono tone="accent">.cursor</Badge>
-                <Badge v-if="!p.hasClaudeDir && !p.hasCursorDir">нет .claude / .cursor</Badge>
-                <Badge v-if="p.hasClaudeMd" mono>CLAUDE.md</Badge>
-                <Badge v-if="p.hasMcpJson" mono>.mcp.json</Badge>
-                <Badge v-if="p.hasCursorMcpJson" mono>.cursor/mcp.json</Badge>
+                <ProductBadge v-if="hasClaude(p)" product="claude" />
+                <ProductBadge v-if="hasCursor(p)" product="cursor" />
               </span>
               <span class="truncate font-mono text-2xs text-subtle" :title="p.path">{{ shortenPath(p.path) }}</span>
             </button>
             <div class="flex items-center gap-1">
-              <Badge v-for="c in counts(p)" :key="c.label" mono>{{ c.n }} {{ c.label }}</Badge>
+              <Badge v-for="c in counts(p)" :key="c.key" mono>{{ c.text }}</Badge>
             </div>
-            <span class="w-24 shrink-0 text-right text-2xs text-subtle">{{ p.artifactCount }} артефактов</span>
-            <div class="flex items-center gap-1">
-              <button type="button" class="btn !h-6" @click="open(p)">Инвентарь</button>
-              <template v-if="confirming === p.path">
-                <button type="button" class="btn !h-6 text-danger" @click="remove(p)">Убрать из списка</button>
-                <button type="button" class="btn-ghost !h-6" @click="confirming = null">Отмена</button>
-              </template>
-              <button
-                v-else
-                type="button"
-                class="btn-ghost !h-6 opacity-0 group-hover:opacity-100"
-                title="Убрать из списка приложения (файлы не удаляются)"
-                @click="confirming = p.path"
-              >
-                <Icon name="x" :size="12" />
-              </button>
-            </div>
+            <button
+              type="button"
+              class="btn-ghost !h-6 opacity-0 group-hover:opacity-100"
+              title="Убрать из списка приложения (файлы не удаляются)"
+              @click.stop="pendingRemove = p"
+            >
+              <Icon name="x" :size="12" />
+            </button>
           </li>
         </ul>
       </section>
     </div>
+
+    <ConfirmDialog
+      :open="!!pendingRemove"
+      title="Убрать проект из списка?"
+      :description="
+        pendingRemove
+          ? `${pendingRemove.name}\n${shortenPath(pendingRemove.path)}\n\nПроект только скроется из Agent Scope. Файлы на диске не удаляются.`
+          : ''
+      "
+      confirm-label="Убрать"
+      cancel-label="Отмена"
+      danger
+      @confirm="confirmRemoveProject"
+      @cancel="pendingRemove = null"
+    />
+
+    <ConfirmDialog
+      :open="!!pendingRemoveRoot"
+      title="Убрать корень сканирования?"
+      :description="
+        pendingRemoveRoot
+          ? `${shortenPath(pendingRemoveRoot)}\n\nКорень только уберётся из Agent Scope. Файлы и проекты на диске не удаляются.`
+          : ''
+      "
+      confirm-label="Убрать"
+      cancel-label="Отмена"
+      danger
+      @confirm="confirmRemoveRoot"
+      @cancel="pendingRemoveRoot = null"
+    />
   </div>
 </template>

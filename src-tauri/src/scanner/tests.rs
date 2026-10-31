@@ -24,9 +24,13 @@ fn empty_home_is_ok() {
     let g = scan_global_with(&ScanContext::load(&paths));
     assert!(g.items.errors.is_empty());
     assert!(!g.credentials_present);
-    let s = find(&g.items, ArtifactKind::Settings, "settings.json");
-    assert_eq!(s.status, DiscoveryStatus::Missing);
-    assert_eq!(find(&g.items, ArtifactKind::ClaudeMd, "CLAUDE.md").status, DiscoveryStatus::Missing);
+    // Absent optional files are not listed as missing placeholders.
+    assert!(!g.items.artifacts.iter().any(|a| a.status == DiscoveryStatus::Missing));
+    assert!(g
+        .items
+        .artifacts
+        .iter()
+        .all(|a| a.kind != ArtifactKind::Settings && a.kind != ArtifactKind::ClaudeMd));
     assert!(g.items.skills.is_empty());
 }
 

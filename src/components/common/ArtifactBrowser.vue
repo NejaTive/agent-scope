@@ -17,7 +17,7 @@ import {
 } from "@/lib/labels";
 import { relativeTime, shortenPath } from "@/lib/format";
 import type { BrowserItem } from "@/lib/browser";
-import type { ArtifactKind, Product } from "@/types/config";
+import type { ArtifactKind, Product, Scope } from "@/types/config";
 import ArtifactDetail from "./ArtifactDetail.vue";
 import EmptyState from "./EmptyState.vue";
 import LoadingBlock from "./LoadingBlock.vue";
@@ -79,11 +79,19 @@ const productScoped = computed(() =>
     : props.items.filter((i) => resolveProduct(i.product) === product.value),
 );
 
+const kindLabel = (k: string) => KIND_PLURAL[k as ArtifactKind] ?? k;
+
 const kindCounts = computed(() => {
   const m = new Map<string, number>();
   for (const i of productScoped.value) if (i.kind) m.set(String(i.kind), (m.get(String(i.kind)) ?? 0) + 1);
   return m;
 });
+
+const kindOptions = computed(() =>
+  [...kindCounts.value.entries()]
+    .map(([k, n]) => ({ kind: k, count: n, label: kindLabel(k) }))
+    .sort((a, b) => a.label.localeCompare(b.label, "ru")),
+);
 
 const kindScoped = computed(() =>
   kind.value === "all"
@@ -115,12 +123,34 @@ const productChips = computed(() =>
   })),
 );
 
-const scopeChips = computed(() =>
+const scopeOptions = computed(() =>
   SCOPE_ORDER.filter((s) => availableScopes.value.has(s)).map((s) => ({
     scope: s,
     count: availableScopes.value.get(s) ?? 0,
+    label: SCOPE_LABEL[s],
   })),
 );
+
+const showKindSelect = computed(() => props.kindFilter && kindOptions.value.length > 1);
+const showScopeSelect = computed(() => scopeOptions.value.length > 1);
+
+const filtersActive = computed(
+  () => product.value !== "all" || kind.value !== "all" || scope.value !== "all",
+);
+
+function resetFilters() {
+  product.value = "all";
+  kind.value = "all";
+  scope.value = "all";
+}
+
+// Drop stale kind/scope when the available options shrink.
+watch(kindOptions, (opts) => {
+  if (kind.value !== "all" && !opts.some((o) => o.kind === kind.value)) kind.value = "all";
+});
+watch(scopeOptions, (opts) => {
+  if (scope.value !== "all" && !opts.some((o) => o.scope === scope.value)) scope.value = "all";
+});
 
 const selectedId = ref<string | null>(null);
 const selected = computed(() => sorted.value.find((i) => i.id === selectedId.value) ?? null);
@@ -153,7 +183,6 @@ watch(
   { immediate: true },
 );
 
-const kindLabel = (k: string) => KIND_PLURAL[k as ArtifactKind] ?? k;
 </script>
 
 <template>
@@ -164,7 +193,7 @@ const kindLabel = (k: string) => KIND_PLURAL[k as ArtifactKind] ?? k;
     >
       <slot name="header" />
 
-      <div class="shrink-0 space-y-1 border-b border-line px-2 py-1.5">
+      <div class="shrink-0 space-y-1.5 border-b border-line px-2 py-1.5">
         <div v-if="showProductFilter" class="flex flex-wrap gap-0.5">
           <button
             type="button"
@@ -172,7 +201,7 @@ const kindLabel = (k: string) => KIND_PLURAL[k as ArtifactKind] ?? k;
             :class="product === 'all' && 'chip-active'"
             @click="product = 'all'"
           >
-            Все продукты
+            Все
           </button>
           <button
             v-for="c in productChips"
@@ -183,48 +212,39 @@ const kindLabel = (k: string) => KIND_PLURAL[k as ArtifactKind] ?? k;
             @click="product = c.product"
           >
             {{ PRODUCT_LABEL[c.product] }}
-            <span class="font-mono text-2xs text-subtle">{{ c.count }}</span>
           </button>
         </div>
-        <div v-if="kindFilter && kindCounts.size > 1" class="flex flex-wrap gap-0.5">
-          <button
-            type="button"
-            class="chip"
-            :class="kind === 'all' && 'chip-active'"
-            @click="kind = 'all'"
+        <div class="flex flex-wrap items-center gap-1.5">
+          <select
+            v-if="showKindSelect"
+            class="input max-w-[9.5rem] shrink-0"
+            :value="kind"
+            @change="kind = ($event.target as HTMLSelectElement).value"
           >
-            Все типы
-          </button>
-          <button
-            v-for="[k, n] in kindCounts"
-            :key="k"
-            type="button"
-            class="chip"
-            :class="kind === k && 'chip-active'"
-            @click="kind = k"
+            <option value="all">Все типы</option>
+            <option v-for="o in kindOptions" :key="o.kind" :value="o.kind">
+              {{ o.label }}
+            </option>
+          </select>
+          <select
+            v-if="showScopeSelect"
+            class="input max-w-[9.5rem] shrink-0"
+            :value="scope"
+            @change="scope = ($event.target as HTMLSelectElement).value as Scope | 'all'"
           >
-            {{ kindLabel(k) }} <span class="font-mono text-2xs text-subtle">{{ n }}</span>
-          </button>
-        </div>
-        <div class="flex flex-wrap items-center gap-0.5">
+            <option value="all">Все области</option>
+            <option v-for="o in scopeOptions" :key="o.scope" :value="o.scope">
+              {{ o.label }}
+            </option>
+          </select>
           <button
+            v-if="filtersActive"
             type="button"
-            class="chip"
-            :class="scope === 'all' && 'chip-active'"
-            @click="scope = 'all'"
+            class="btn-ghost !h-7 !px-1.5 text-2xs"
+            title="Сбросить фильтры"
+            @click="resetFilters"
           >
-            Все
-          </button>
-          <button
-            v-for="c in scopeChips"
-            :key="c.scope"
-            type="button"
-            class="chip"
-            :class="scope === c.scope && 'chip-active'"
-            @click="scope = c.scope"
-          >
-            {{ SCOPE_LABEL[c.scope] }}
-            <span class="font-mono text-2xs text-subtle">{{ c.count }}</span>
+            Сбросить
           </button>
           <span class="ml-auto pr-1 font-mono text-2xs text-subtle">{{ sorted.length }}</span>
         </div>

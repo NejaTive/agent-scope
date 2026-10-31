@@ -13,7 +13,6 @@ import type {
   ProjectInfo,
   RecentChange,
   RenameArtifactResult,
-  ResolvedSetting,
   SaveArtifactResult,
   SearchFilters,
   SettingsDiff,
@@ -102,10 +101,6 @@ export const ipc = {
     call<DeleteArtifactResult>("delete_artifact", {
       path,
       expectedHash: expectedHash ?? null,
-    }),
-  getEffectiveSettings: (projectPath?: string | null) =>
-    call<ResolvedSetting[]>("get_effective_settings", {
-      projectPath: projectPath ?? null,
     }),
   getConflicts: () => call<Conflict[]>("get_conflicts"),
   getSettingsDiff: (projectPath: string) =>

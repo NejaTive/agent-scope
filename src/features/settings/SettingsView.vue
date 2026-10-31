@@ -86,8 +86,10 @@ const selectedProject = computed(() =>
 
 <template>
   <div class="flex h-full min-h-0">
-    <aside class="flex w-52 shrink-0 flex-col border-r border-line">
-      <div class="shrink-0 border-b border-line px-3 py-2"><ProjectSelect all-label="Все области" /></div>
+    <aside class="flex w-52 shrink-0 flex-col overflow-hidden border-r border-line">
+      <div class="min-w-0 shrink-0 border-b border-line px-3 py-2">
+        <ProjectSelect block all-label="Все области" />
+      </div>
       <nav class="flex-1 space-y-px overflow-y-auto p-2">
         <button
           type="button"

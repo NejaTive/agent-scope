@@ -27,6 +27,7 @@ export function useSettingsDocs() {
 
   const artifacts = computed(() =>
     scan.settingsArtifacts.filter((a) => {
+      if (a.status === "missing") return false;
       if (!isProjectScope(a.scope)) return true;
       return !selectedProjectPath.value || a.projectPath === selectedProjectPath.value;
     }),

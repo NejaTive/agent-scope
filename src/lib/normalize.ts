@@ -140,12 +140,16 @@ export function normalizeSnapshot(
   const rawMcp: McpServerEntry[] = [];
 
   for (const b of bundles) {
-    artifacts.push(...arr(b.artifacts).map((a) => withProduct(a)));
+    artifacts.push(
+      ...arr(b.artifacts)
+        .map((a) => withProduct(a))
+        .filter((a) => a.status !== "missing"),
+    );
     settingsLayers.push(...arr(b.settingsLayers));
-    errors.push(...arr(b.errors));
-    rawSkills.push(...arr(b.skills));
-    rawRules.push(...arr(b.rules));
-    rawAgents.push(...arr(b.agents));
+    errors.push(...arr(b.errors).filter((e) => e.status !== "missing"));
+    rawSkills.push(...arr(b.skills).filter((s) => s.status !== "missing"));
+    rawRules.push(...arr(b.rules).filter((r) => r.status !== "missing"));
+    rawAgents.push(...arr(b.agents).filter((a) => a.status !== "missing"));
     rawHooks.push(...arr(b.hooks));
     rawMcp.push(...arr(b.mcpServers));
   }

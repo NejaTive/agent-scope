@@ -55,7 +55,6 @@ pub fn run() {
             commands::save_artifact_content,
             commands::rename_artifact,
             commands::delete_artifact,
-            commands::get_effective_settings,
             commands::get_conflicts,
             commands::get_settings_diff,
             commands::get_recent_changes,

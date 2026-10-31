@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { ipc } from "@/lib/ipc";
 import { errMsg, normalizeContent } from "@/lib/normalize";
 import { extname, formatTime, shortenPath } from "@/lib/format";
@@ -15,6 +15,7 @@ import ScopeBadge from "./ScopeBadge.vue";
 import LoadingBlock from "./LoadingBlock.vue";
 import EmptyState from "./EmptyState.vue";
 import Icon from "./Icon.vue";
+import ConfirmDialog from "./ConfirmDialog.vue";
 import MarkdownViewer from "@/components/viewers/MarkdownViewer.vue";
 import JsonViewer from "@/components/viewers/JsonViewer.vue";
 import CodeViewer from "@/components/viewers/CodeViewer.vue";
@@ -46,6 +47,43 @@ const contentHash = ref<string | null>(null);
 const editError = ref<string | null>(null);
 const undoPrevious = ref<string | null>(null);
 const undoHash = ref<string | null>(null);
+const pendingDelete = ref(false);
+const pendingRename = ref(false);
+const renameDraft = ref("");
+const renameInput = ref<HTMLInputElement | null>(null);
+const actionsOpen = ref(false);
+
+function closeActions() {
+  actionsOpen.value = false;
+}
+
+function toggleActions() {
+  if (editLoading.value || loading.value || saving.value) return;
+  actionsOpen.value = !actionsOpen.value;
+}
+
+function onDocPointerDown(e: PointerEvent) {
+  if (!actionsOpen.value) return;
+  const t = e.target as Node | null;
+  const root = actionsRoot.value;
+  if (root && t && root.contains(t)) return;
+  closeActions();
+}
+
+function onDocKey(e: KeyboardEvent) {
+  if (e.key === "Escape" && actionsOpen.value) closeActions();
+}
+
+const actionsRoot = ref<HTMLElement | null>(null);
+
+onMounted(() => {
+  document.addEventListener("pointerdown", onDocPointerDown, true);
+  document.addEventListener("keydown", onDocKey);
+});
+onUnmounted(() => {
+  document.removeEventListener("pointerdown", onDocPointerDown, true);
+  document.removeEventListener("keydown", onDocKey);
+});
 
 /** `get_artifact_content` takes a filesystem path, never an artifact id. */
 const contentPath = computed(() => props.item.artifactId ?? props.item.path);
@@ -189,14 +227,30 @@ async function hashForMutation(): Promise<string> {
   return raw.contentHash;
 }
 
-async function renameFile() {
-  if (!canEdit.value || editing.value) return;
+async function requestRename() {
+  if (!canEdit.value || editing.value || saving.value) return;
   if (!confirmLeaveDirty()) return;
+  renameDraft.value = basenameOf(contentPath.value);
+  pendingRename.value = true;
+  await nextTick();
+  renameInput.value?.focus();
+  renameInput.value?.select();
+}
+
+async function confirmRename() {
+  if (!pendingRename.value || !canEdit.value) return;
   const current = basenameOf(contentPath.value);
-  const next = window.prompt("Новое имя файла (только имя в этой папке):", current);
-  if (next == null) return;
-  const trimmed = next.trim();
-  if (!trimmed || trimmed === current) return;
+  const trimmed = renameDraft.value.trim();
+  if (!trimmed || trimmed === current) {
+    pendingRename.value = false;
+    return;
+  }
+  if (/[/\\]/.test(trimmed)) {
+    editError.value = "Имя файла не должно содержать путь.";
+    pendingRename.value = false;
+    return;
+  }
+  pendingRename.value = false;
   editError.value = null;
   saving.value = true;
   try {
@@ -213,13 +267,15 @@ async function renameFile() {
   }
 }
 
-async function deleteFile() {
-  if (!canEdit.value || editing.value) return;
+function requestDelete() {
+  if (!canEdit.value || editing.value || saving.value) return;
   if (!confirmLeaveDirty()) return;
-  const ok = window.confirm(
-    `Удалить файл навсегда?\n\n${contentPath.value}\n\nЭто действие нельзя отменить из приложения.`,
-  );
-  if (!ok) return;
+  pendingDelete.value = true;
+}
+
+async function confirmDelete() {
+  if (!pendingDelete.value || !canEdit.value) return;
+  pendingDelete.value = false;
   editError.value = null;
   saving.value = true;
   try {
@@ -240,6 +296,9 @@ watch(
   () => contentPath.value,
   () => {
     if (editing.value && !confirmLeaveDirty()) return;
+    pendingDelete.value = false;
+    pendingRename.value = false;
+    closeActions();
     resetEditState();
     undoPrevious.value = null;
     undoHash.value = null;
@@ -274,7 +333,10 @@ const status = computed(() => props.item.status ?? "present");
         <Badge v-if="kindLabel">{{ kindLabel }}</Badge>
         <ProductBadge :product="item.product" />
         <ScopeBadge :scope="item.scope" />
-        <Badge :tone="STATUS_TONE[status]">{{ STATUS_LABEL[status] }}</Badge>
+        <Badge
+          v-if="status !== 'present'"
+          :tone="STATUS_TONE[status]"
+        >{{ STATUS_LABEL[status] }}</Badge>
         <span
           v-if="!allowEditing"
           class="ml-auto flex items-center gap-1 text-2xs text-subtle"
@@ -282,40 +344,7 @@ const status = computed(() => props.item.status ?? "present");
         >
           <Icon name="lock" :size="11" /> только просмотр
         </span>
-        <div v-else class="ml-auto flex items-center gap-2">
-          <span
-            v-if="!editing"
-            class="flex items-center gap-1 text-2xs text-subtle"
-            title="Редактирование включено. Сохраняется только сырой файл из allowlist."
-          >
-            можно редактировать
-          </span>
-          <template v-if="canEdit && !editing">
-            <button
-              type="button"
-              class="chip !h-6"
-              :disabled="editLoading || loading || saving"
-              @click="startEdit"
-            >
-              {{ editLoading ? "Загрузка…" : "Изменить" }}
-            </button>
-            <button
-              type="button"
-              class="chip !h-6"
-              :disabled="loading || saving"
-              @click="renameFile"
-            >
-              Переименовать
-            </button>
-            <button
-              type="button"
-              class="chip !h-6 text-danger"
-              :disabled="loading || saving"
-              @click="deleteFile"
-            >
-              Удалить
-            </button>
-          </template>
+        <div v-else class="relative ml-auto flex items-center gap-2" ref="actionsRoot">
           <template v-if="editing">
             <button
               type="button"
@@ -334,15 +363,63 @@ const status = computed(() => props.item.status ?? "present");
               {{ saving ? "Сохранение…" : "Сохранить" }}
             </button>
           </template>
-          <button
-            v-if="!editing && undoPrevious != null"
-            type="button"
-            class="chip !h-6"
-            :disabled="saving"
-            @click="undoLastSave"
-          >
-            Отменить сохранение
-          </button>
+          <template v-else-if="canEdit">
+            <button
+              type="button"
+              class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-elevated hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="editLoading || loading || saving"
+              :aria-expanded="actionsOpen"
+              aria-haspopup="menu"
+              title="Действия"
+              @click="toggleActions"
+            >
+              <Icon name="more" :size="16" class="block" />
+            </button>
+            <div
+              v-if="actionsOpen"
+              role="menu"
+              class="absolute right-0 top-7 z-20 min-w-[10.5rem] overflow-hidden rounded-md border border-line bg-surface py-1 shadow-lg shadow-black/30"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                class="flex w-full px-3 py-1.5 text-left text-xs text-fg hover:bg-elevated disabled:opacity-50"
+                :disabled="editLoading || loading || saving"
+                @click="closeActions(); startEdit()"
+              >
+                {{ editLoading ? "Загрузка…" : "Изменить" }}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                class="flex w-full px-3 py-1.5 text-left text-xs text-fg hover:bg-elevated disabled:opacity-50"
+                :disabled="loading || saving"
+                @click="closeActions(); requestRename()"
+              >
+                Переименовать
+              </button>
+              <button
+                v-if="undoPrevious != null"
+                type="button"
+                role="menuitem"
+                class="flex w-full px-3 py-1.5 text-left text-xs text-fg hover:bg-elevated disabled:opacity-50"
+                :disabled="saving"
+                @click="closeActions(); undoLastSave()"
+              >
+                Отменить сохранение
+              </button>
+              <div class="my-1 border-t border-line" />
+              <button
+                type="button"
+                role="menuitem"
+                class="flex w-full px-3 py-1.5 text-left text-xs text-danger hover:bg-elevated disabled:opacity-50"
+                :disabled="loading || saving"
+                @click="closeActions(); requestDelete()"
+              >
+                Удалить
+              </button>
+            </div>
+          </template>
         </div>
       </div>
       <p v-if="item.subtitle" class="text-xs text-muted">{{ item.subtitle }}</p>
@@ -425,5 +502,34 @@ const status = computed(() => props.item.status ?? "present");
         </template>
       </section>
     </div>
+
+    <ConfirmDialog
+      :open="pendingRename"
+      title="Переименовать файл"
+      description="Только имя в этой папке, без пути."
+      confirm-label="Переименовать"
+      cancel-label="Отмена"
+      @confirm="confirmRename"
+      @cancel="pendingRename = false"
+    >
+      <input
+        ref="renameInput"
+        v-model="renameDraft"
+        class="input w-full font-mono"
+        spellcheck="false"
+        @keydown.enter.prevent="confirmRename"
+      />
+    </ConfirmDialog>
+
+    <ConfirmDialog
+      :open="pendingDelete"
+      title="Удалить файл навсегда?"
+      :description="`${contentPath}\n\nЭто действие нельзя отменить из приложения.`"
+      confirm-label="Удалить"
+      cancel-label="Отмена"
+      danger
+      @confirm="confirmDelete"
+      @cancel="pendingDelete = false"
+    />
   </div>
 </template>

@@ -8,6 +8,7 @@ import { useTheme } from "@/composables/useTheme";
 import { ipc } from "@/lib/ipc";
 import { KIND_LABEL, routeForKind } from "@/lib/labels";
 import { shortenPath } from "@/lib/format";
+import { RU, pluralCount } from "@/lib/plural";
 import type { SearchHit } from "@/types/config";
 import Icon from "@/components/common/Icon.vue";
 import SearchInput from "@/components/common/SearchInput.vue";
@@ -92,7 +93,7 @@ function openHit(hit: SearchHit) {
     <div class="relative w-72">
       <SearchInput
         v-model="search"
-        :placeholder="searchable ? 'Фильтр вида · поиск по всем…' : 'Поиск по всем артефактам…'"
+        :placeholder="searchable ? 'Поиск…' : 'Поиск по артефактам…'"
         @focus="focused = true"
         @blur="focused = false"
       />
@@ -124,8 +125,8 @@ function openHit(hit: SearchHit) {
         class="btn-ghost relative"
         :title="
           ui.unseenChanges
-            ? `${ui.unseenChanges} новых изменений`
-            : `${changeCount} недавних изменений`
+            ? pluralCount(ui.unseenChanges, RU.newChange)
+            : pluralCount(changeCount, RU.recentChange)
         "
         @click="openChanges"
       >

@@ -45,8 +45,6 @@ export type DiscoveryStatus =
   | "invalidFrontmatter"
   | "partial";
 
-export type Confidence = "computed" | "inferred" | "unknown";
-
 /** Claude Code vs Cursor product tagging (`product` field). */
 export type Tooling = "claude" | "cursor";
 /** @deprecated Prefer `Tooling`. */
@@ -224,26 +222,6 @@ export interface Conflict {
   message: string;
   projectPath?: string | null;
   entries: ConflictEntry[];
-}
-
-export interface SettingSource {
-  scope: Scope;
-  path: string;
-  value: Json;
-}
-
-export interface ResolvedSetting {
-  key: string;
-  value: Json;
-  /** Winning scope (highest precedence contributor). */
-  scope: Scope;
-  sourcePath?: string | null;
-  confidence: Confidence;
-  explanation: string;
-  /** True when the value is a list-merge of multiple scopes. */
-  merged: boolean;
-  /** All scopes that define this key, highest precedence first. */
-  sources: SettingSource[];
 }
 
 export interface SettingsDiffRow {

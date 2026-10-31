@@ -78,7 +78,7 @@ pub fn scan_global_with(ctx: &ScanContext) -> GlobalBundle {
     let mut c = Collection::default();
 
     // Managed (enterprise) — optional, may be unreadable.
-    collect_settings_file(&mut c, &paths.managed_dir.join("managed-settings.json"), Scope::Managed, None, true);
+    collect_settings_file(&mut c, &paths.managed_dir.join("managed-settings.json"), Scope::Managed, None, false);
     let drop_in = paths.managed_dir.join("managed-settings.d");
     if let Ok(rd) = std::fs::read_dir(&drop_in) {
         let mut files: Vec<PathBuf> = rd
@@ -95,8 +95,8 @@ pub fn scan_global_with(ctx: &ScanContext) -> GlobalBundle {
     collect_mcp_json(&mut c, &paths.managed_dir.join("managed-mcp.json"), Scope::Managed, None, "managed-mcp.json");
 
     // User scope (Claude)
-    collect_settings_file(&mut c, &paths.config_dir.join("settings.json"), Scope::User, None, true);
-    collect_claude_md(&mut c, &paths.config_dir.join("CLAUDE.md"), Scope::User, None, true);
+    collect_settings_file(&mut c, &paths.config_dir.join("settings.json"), Scope::User, None, false);
+    collect_claude_md(&mut c, &paths.config_dir.join("CLAUDE.md"), Scope::User, None, false);
     collect_claude_dir(&mut c, &paths.config_dir, Scope::User, None);
     plugins::collect_plugins(&mut c, paths);
     plugins::collect_memory(&mut c, paths);
@@ -172,10 +172,10 @@ pub fn scan_project_with(ctx: &ScanContext, root: &Path) -> ProjectBundle {
     let mut c = Collection::default();
     let claude = root.join(".claude");
 
-    collect_settings_file(&mut c, &claude.join("settings.json"), Scope::Project, p, true);
-    collect_settings_file(&mut c, &claude.join("settings.local.json"), Scope::ProjectLocal, p, true);
+    collect_settings_file(&mut c, &claude.join("settings.json"), Scope::Project, p, false);
+    collect_settings_file(&mut c, &claude.join("settings.local.json"), Scope::ProjectLocal, p, false);
 
-    collect_claude_md(&mut c, &root.join("CLAUDE.md"), Scope::Project, p, true);
+    collect_claude_md(&mut c, &root.join("CLAUDE.md"), Scope::Project, p, false);
     collect_claude_md(&mut c, &claude.join("CLAUDE.md"), Scope::Project, p, false);
     collect_claude_md(&mut c, &root.join("CLAUDE.local.md"), Scope::ProjectLocal, p, false);
     collect_claude_md(&mut c, &root.join("AGENTS.md"), Scope::Project, p, false);
