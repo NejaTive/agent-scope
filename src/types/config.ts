@@ -311,6 +311,28 @@ export interface ArtifactContent {
   language: string;
 }
 
+/** Raw (unmasked) content for Edit mode. */
+export interface ArtifactContentForEdit {
+  text: string;
+  language: string;
+  contentHash: string;
+  writable: boolean;
+}
+
+export interface SaveArtifactResult {
+  /** Previous on-disk content for one-level UI undo (no `.bak` on disk). */
+  previousContent: string;
+  contentHash: string;
+}
+
+export interface RenameArtifactResult {
+  newPath: string;
+}
+
+export interface DeleteArtifactResult {
+  deletedPath: string;
+}
+
 export interface AppInfo {
   name: string;
   version: string;
@@ -320,6 +342,8 @@ export interface Preferences {
   theme: ThemePreference;
   watchOnStart: boolean;
   notifications: boolean;
+  /** Opt-in: allow writing allowlisted config files. Default false. */
+  allowEditing: boolean;
 }
 
 export type AppPreferences = Preferences;

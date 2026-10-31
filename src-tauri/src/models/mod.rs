@@ -496,6 +496,36 @@ pub struct ArtifactContent {
     pub language: String,
 }
 
+/// Raw (unmasked) artifact text for an explicit Edit session.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactContentForEdit {
+    pub text: String,
+    pub language: String,
+    pub content_hash: String,
+    pub writable: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveArtifactResult {
+    /// Previous on-disk content (for one-level UI undo). No `.bak` is written.
+    pub previous_content: String,
+    pub content_hash: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameArtifactResult {
+    pub new_path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteArtifactResult {
+    pub deleted_path: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppInfo {
@@ -509,6 +539,8 @@ pub struct Preferences {
     pub theme: String,
     pub watch_on_start: bool,
     pub notifications: bool,
+    /// Opt-in: allow writing allowlisted config files via Edit mode.
+    pub allow_editing: bool,
 }
 
 impl Default for Preferences {
@@ -517,6 +549,7 @@ impl Default for Preferences {
             theme: "system".into(),
             watch_on_start: false,
             notifications: false,
+            allow_editing: false,
         }
     }
 }

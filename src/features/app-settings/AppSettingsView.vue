@@ -94,12 +94,35 @@ const THEMES: Array<{ value: ThemePreference; label: string }> = [
       </section>
 
       <section>
+        <h2 class="label mb-2">Редактирование</h2>
+        <div class="card divide-y divide-line">
+          <label class="flex cursor-pointer items-center justify-between gap-4 px-3 py-2.5">
+            <div>
+              <div class="text-[13px] font-medium">Разрешить редактирование файлов конфигурации</div>
+              <div class="text-xs text-muted">
+                По умолчанию выключено. Включает правку, переименование (в той же папке) и удаление
+                существующих файлов из allowlist (rules, skills, settings, MCP, hooks и т.п.). Создание
+                новых артефактов с нуля не поддерживается. Effective Config — только просмотр. В режиме
+                правки секреты не маскируются.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              class="h-3.5 w-3.5 shrink-0 accent-[rgb(var(--accent))]"
+              :checked="prefs.prefs.allowEditing"
+              @change="prefs.update({ allowEditing: ($event.target as HTMLInputElement).checked })"
+            />
+          </label>
+        </div>
+      </section>
+
+      <section>
         <h2 class="label mb-2">О приложении</h2>
         <dl class="card grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 px-3 py-2.5 text-xs">
           <dt class="text-subtle">Название</dt>
           <dd>{{ scan.appInfo?.name ?? "Agent Scope" }}</dd>
           <dt class="text-subtle">Версия</dt>
-          <dd class="font-mono">{{ scan.appInfo?.version ?? "0.2.0" }}</dd>
+          <dd class="font-mono">{{ scan.appInfo?.version ?? "0.3.0" }}</dd>
           <template v-if="scan.globalMeta.configDir">
             <dt class="text-subtle">Каталог Claude Code</dt>
             <dd class="break-all font-mono">{{ shortenPath(scan.globalMeta.configDir) }}</dd>
@@ -121,7 +144,8 @@ const THEMES: Array<{ value: ThemePreference; label: string }> = [
         </dl>
         <p class="mt-2 flex items-center gap-1.5 text-2xs text-subtle">
           <Icon name="lock" :size="11" />
-          Agent Scope только для чтения: не создаёт, не изменяет и не удаляет конфигурацию Claude Code или Cursor.
+          По умолчанию — просмотр. Запись / rename / delete — opt-in и только для существующих файлов из
+          allowlist; credentials и пути вне списка не трогаются.
         </p>
       </section>
     </div>

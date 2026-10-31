@@ -1,4 +1,5 @@
-//! Agent Scope — read-only viewer for Claude Code configuration.
+//! Agent Scope — viewer for Claude Code / Cursor configuration with opt-in
+//! editing of allowlisted existing files.
 
 pub mod commands;
 pub mod errors;
@@ -48,6 +49,10 @@ pub fn run() {
             commands::remove_project,
             commands::pick_directory,
             commands::get_artifact_content,
+            commands::get_artifact_content_for_edit,
+            commands::save_artifact_content,
+            commands::rename_artifact,
+            commands::delete_artifact,
             commands::get_effective_settings,
             commands::get_conflicts,
             commands::get_settings_diff,

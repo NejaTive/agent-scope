@@ -92,6 +92,9 @@ impl Storage {
         if let Some(v) = self.get_pref("notifications")? {
             p.notifications = v == "true";
         }
+        if let Some(v) = self.get_pref("allowEditing")? {
+            p.allow_editing = v == "true";
+        }
         Ok(p)
     }
 
@@ -99,6 +102,7 @@ impl Storage {
         self.set_pref("theme", &p.theme)?;
         self.set_pref("watchOnStart", &p.watch_on_start.to_string())?;
         self.set_pref("notifications", &p.notifications.to_string())?;
+        self.set_pref("allowEditing", &p.allow_editing.to_string())?;
         Ok(())
     }
 
@@ -206,11 +210,17 @@ mod tests {
     fn prefs_roundtrip() {
         let s = Storage::open_in_memory().unwrap();
         assert_eq!(s.get_preferences().unwrap().theme, "system");
-        let p = Preferences { theme: "dark".into(), watch_on_start: true, notifications: true };
+        let p = Preferences {
+            theme: "dark".into(),
+            watch_on_start: true,
+            notifications: true,
+            allow_editing: true,
+        };
         s.set_preferences(&p).unwrap();
         let got = s.get_preferences().unwrap();
         assert_eq!(got.theme, "dark");
-        assert!(got.watch_on_start && got.notifications);
+        assert!(got.watch_on_start && got.notifications && got.allow_editing);
+        assert!(!Preferences::default().allow_editing);
         s.set_pref("theme", "light").unwrap();
         assert_eq!(s.get_pref("theme").unwrap().as_deref(), Some("light"));
     }

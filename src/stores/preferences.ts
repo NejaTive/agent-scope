@@ -10,6 +10,7 @@ const DEFAULTS: Preferences = {
   theme: "dark",
   watchOnStart: false,
   notifications: false,
+  allowEditing: false,
 };
 
 const THEMES: ThemePreference[] = ["dark", "light", "system"];
@@ -19,6 +20,7 @@ function sanitize(p: Partial<Preferences>): Partial<Preferences> {
   if (p.theme && THEMES.includes(p.theme)) out.theme = p.theme;
   if (typeof p.watchOnStart === "boolean") out.watchOnStart = p.watchOnStart;
   if (typeof p.notifications === "boolean") out.notifications = p.notifications;
+  if (typeof p.allowEditing === "boolean") out.allowEditing = p.allowEditing;
   return out;
 }
 

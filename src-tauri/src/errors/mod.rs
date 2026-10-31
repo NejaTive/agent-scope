@@ -17,6 +17,8 @@ pub enum AppError {
     InvalidPath(String),
     #[error("Access denied: {0}")]
     AccessDenied(String),
+    #[error("Conflict: {0}")]
+    Conflict(String),
     #[error("Watcher error: {0}")]
     Watcher(String),
     #[error("{0}")]
@@ -32,6 +34,7 @@ impl AppError {
             AppError::NotFound(_) => "notFound",
             AppError::InvalidPath(_) => "invalidPath",
             AppError::AccessDenied(_) => "accessDenied",
+            AppError::Conflict(_) => "conflict",
             AppError::Watcher(_) => "watcher",
             AppError::Other(_) => "other",
         }

@@ -3,14 +3,18 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   AppInfo,
   ArtifactContent,
+  ArtifactContentForEdit,
   BackendScanSnapshot,
   ConfigArtifact,
   Conflict,
   DashboardStats,
+  DeleteArtifactResult,
   Preferences,
   ProjectInfo,
   RecentChange,
+  RenameArtifactResult,
   ResolvedSetting,
+  SaveArtifactResult,
   SearchFilters,
   SettingsDiff,
 } from "@/types/config";
@@ -78,6 +82,26 @@ export const ipc = {
   /** `path` is the filesystem path of the artifact (not its id). */
   getArtifactContent: (path: string) =>
     call<ArtifactContent>("get_artifact_content", { path }),
+  /** Raw unmasked content for Edit mode (requires prefs.allowEditing). */
+  getArtifactContentForEdit: (path: string) =>
+    call<ArtifactContentForEdit>("get_artifact_content_for_edit", { path }),
+  saveArtifactContent: (path: string, content: string, expectedHash?: string | null) =>
+    call<SaveArtifactResult>("save_artifact_content", {
+      path,
+      content,
+      expectedHash: expectedHash ?? null,
+    }),
+  renameArtifact: (path: string, newName: string, expectedHash?: string | null) =>
+    call<RenameArtifactResult>("rename_artifact", {
+      path,
+      newName,
+      expectedHash: expectedHash ?? null,
+    }),
+  deleteArtifact: (path: string, expectedHash?: string | null) =>
+    call<DeleteArtifactResult>("delete_artifact", {
+      path,
+      expectedHash: expectedHash ?? null,
+    }),
   getEffectiveSettings: (projectPath?: string | null) =>
     call<ResolvedSetting[]>("get_effective_settings", {
       projectPath: projectPath ?? null,

@@ -1,4 +1,5 @@
-//! Tauri commands. Everything here is read-only with respect to Claude Code config.
+//! Tauri commands. Config reads are always available; writing existing allowlisted
+//! files is opt-in via `Preferences.allow_editing` and `check_writable`.
 
 use crate::errors::{AppError, AppResult};
 use crate::models::*;
@@ -6,7 +7,8 @@ use crate::parser;
 use crate::paths::language_for;
 use crate::resolver;
 use crate::scanner::{self, discovery};
-use crate::state::AppState;
+use crate::state::{self, AppState};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, State};
 
@@ -173,6 +175,210 @@ pub fn read_artifact_content(state: &AppState, path: &str) -> AppResult<Artifact
 pub async fn get_artifact_content(path: String, state: State<'_, AppState>) -> Result<ArtifactContent, AppError> {
     let st = state.inner().clone();
     spawn_blocking(move || read_artifact_content(&st, &path)).await
+}
+
+fn require_editing_enabled(state: &AppState) -> AppResult<()> {
+    let prefs = state.db.lock().get_preferences()?;
+    if !prefs.allow_editing {
+        return Err(AppError::AccessDenied(
+            "editing is disabled; enable allowEditing in preferences".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Raw (unmasked) content for Edit mode. Requires `allowEditing` and a writable path.
+pub fn read_artifact_content_for_edit(state: &AppState, path: &str) -> AppResult<ArtifactContentForEdit> {
+    require_editing_enabled(state)?;
+    let roots = state.project_roots();
+    let canon = state.paths.check_writable(Path::new(path), &roots)?;
+    let meta = std::fs::metadata(&canon)?;
+    if meta.len() > MAX_CONTENT_BYTES {
+        return Err(AppError::InvalidPath(format!(
+            "file is too large to edit ({} bytes)",
+            meta.len()
+        )));
+    }
+    let bytes = std::fs::read(&canon)?;
+    let text = String::from_utf8(bytes).map_err(|_| AppError::Io("file is not valid UTF-8".into()))?;
+    let content_hash = state::hash_file(&canon).ok_or_else(|| {
+        AppError::Other(format!("could not hash {}", canon.display()))
+    })?;
+    Ok(ArtifactContentForEdit {
+        text,
+        language: language_for(&canon).into(),
+        content_hash,
+        writable: true,
+    })
+}
+
+#[tauri::command]
+pub async fn get_artifact_content_for_edit(
+    path: String,
+    state: State<'_, AppState>,
+) -> Result<ArtifactContentForEdit, AppError> {
+    let st = state.inner().clone();
+    spawn_blocking(move || read_artifact_content_for_edit(&st, &path)).await
+}
+
+/// Atomically write allowlisted config. Returns previous content for UI undo (no `.bak`).
+pub fn write_artifact_content(
+    state: &AppState,
+    path: &str,
+    content: &str,
+    expected_hash: Option<&str>,
+) -> AppResult<SaveArtifactResult> {
+    require_editing_enabled(state)?;
+    let roots = state.project_roots();
+    let canon = state.paths.check_writable(Path::new(path), &roots)?;
+
+    if content.len() as u64 > MAX_CONTENT_BYTES {
+        return Err(AppError::InvalidPath(format!(
+            "content is too large to write ({} bytes)",
+            content.len()
+        )));
+    }
+
+    if language_for(&canon) == "json" {
+        serde_json::from_str::<serde_json::Value>(content)?;
+    }
+
+    let current_hash = state::hash_file(&canon).ok_or_else(|| {
+        AppError::Other(format!("could not hash {}", canon.display()))
+    })?;
+    if let Some(expected) = expected_hash {
+        if expected != current_hash {
+            return Err(AppError::Conflict(
+                "file changed on disk; reload and try again".into(),
+            ));
+        }
+    }
+
+    let previous_bytes = std::fs::read(&canon)?;
+    let previous_content = String::from_utf8(previous_bytes)
+        .map_err(|_| AppError::Io("file is not valid UTF-8".into()))?;
+
+    let parent = canon.parent().ok_or_else(|| {
+        AppError::InvalidPath(format!("{} has no parent directory", canon.display()))
+    })?;
+    let mut tmp = tempfile::NamedTempFile::new_in(parent)?;
+    tmp.write_all(content.as_bytes())?;
+    tmp.as_file().sync_all()?;
+    tmp.persist(&canon).map_err(|e| AppError::Io(e.to_string()))?;
+
+    let content_hash = state::hash_file(&canon).ok_or_else(|| {
+        AppError::Other(format!("could not hash after write {}", canon.display()))
+    })?;
+    let _ = state.db.lock().record_change(
+        &canon.to_string_lossy(),
+        "modified",
+        Some(&content_hash),
+    );
+    state.invalidate();
+
+    Ok(SaveArtifactResult {
+        previous_content,
+        content_hash,
+    })
+}
+
+#[tauri::command]
+pub async fn save_artifact_content(
+    path: String,
+    content: String,
+    expected_hash: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<SaveArtifactResult, AppError> {
+    let st = state.inner().clone();
+    spawn_blocking(move || {
+        write_artifact_content(&st, &path, &content, expected_hash.as_deref())
+    })
+    .await
+}
+
+fn check_expected_hash(canon: &Path, expected_hash: Option<&str>) -> AppResult<()> {
+    if let Some(expected) = expected_hash {
+        let current = state::hash_file(canon).ok_or_else(|| {
+            AppError::Other(format!("could not hash {}", canon.display()))
+        })?;
+        if expected != current {
+            return Err(AppError::Conflict(
+                "file changed on disk; reload and try again".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Rename within the same directory. `new_name` is a basename only.
+pub fn rename_artifact_file(
+    state: &AppState,
+    path: &str,
+    new_name: &str,
+    expected_hash: Option<&str>,
+) -> AppResult<RenameArtifactResult> {
+    require_editing_enabled(state)?;
+    let roots = state.project_roots();
+    let canon = state.paths.check_writable(Path::new(path), &roots)?;
+    check_expected_hash(&canon, expected_hash)?;
+
+    let parent = canon.parent().ok_or_else(|| {
+        AppError::InvalidPath(format!("{} has no parent directory", canon.display()))
+    })?;
+    let dest = state
+        .paths
+        .check_writable_destination(parent, new_name, &roots)?;
+
+    std::fs::rename(&canon, &dest)?;
+    let new_path = dest.to_string_lossy().to_string();
+    let _ = state
+        .db
+        .lock()
+        .record_change(&new_path, "renamed", state::hash_file(&dest).as_deref());
+    state.invalidate();
+    Ok(RenameArtifactResult { new_path })
+}
+
+#[tauri::command]
+pub async fn rename_artifact(
+    path: String,
+    new_name: String,
+    expected_hash: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<RenameArtifactResult, AppError> {
+    let st = state.inner().clone();
+    spawn_blocking(move || {
+        rename_artifact_file(&st, &path, &new_name, expected_hash.as_deref())
+    })
+    .await
+}
+
+/// Delete a single allowlisted file (not recursive).
+pub fn delete_artifact_file(
+    state: &AppState,
+    path: &str,
+    expected_hash: Option<&str>,
+) -> AppResult<DeleteArtifactResult> {
+    require_editing_enabled(state)?;
+    let roots = state.project_roots();
+    let canon = state.paths.check_writable(Path::new(path), &roots)?;
+    check_expected_hash(&canon, expected_hash)?;
+
+    let deleted_path = canon.to_string_lossy().to_string();
+    std::fs::remove_file(&canon)?;
+    let _ = state.db.lock().record_change(&deleted_path, "deleted", None);
+    state.invalidate();
+    Ok(DeleteArtifactResult { deleted_path })
+}
+
+#[tauri::command]
+pub async fn delete_artifact(
+    path: String,
+    expected_hash: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<DeleteArtifactResult, AppError> {
+    let st = state.inner().clone();
+    spawn_blocking(move || delete_artifact_file(&st, &path, expected_hash.as_deref())).await
 }
 
 // ---------------------------------------------------------------- settings & conflicts
@@ -364,5 +570,174 @@ mod tests {
     #[test]
     fn app_info_name() {
         assert_eq!(get_app_info().name, "Agent Scope");
+    }
+
+    fn enable_editing(st: &AppState) {
+        let mut p = st.db.lock().get_preferences().unwrap();
+        p.allow_editing = true;
+        st.db.lock().set_preferences(&p).unwrap();
+    }
+
+    #[test]
+    fn edit_requires_opt_in_and_writable() {
+        let (d, st, proj) = fixture();
+        st.with_snapshot(|_| ()).unwrap();
+        let settings = proj.join(".claude/settings.json");
+        let settings_s = settings.to_str().unwrap();
+
+        assert!(read_artifact_content_for_edit(&st, settings_s).is_err());
+        assert!(write_artifact_content(&st, settings_s, "{}", None).is_err());
+
+        enable_editing(&st);
+
+        let raw = read_artifact_content_for_edit(&st, settings_s).unwrap();
+        assert!(raw.text.contains("supersecret"));
+        assert!(raw.writable);
+        let masked = read_artifact_content(&st, settings_s).unwrap();
+        assert!(!masked.text.contains("supersecret"));
+        assert!(masked.text.contains(parser::MASK));
+
+        assert!(read_artifact_content_for_edit(
+            &st,
+            st.paths.credentials_file().to_str().unwrap()
+        )
+        .is_err());
+        assert!(write_artifact_content(
+            &st,
+            d.path().join("outside.json").to_str().unwrap(),
+            "{}",
+            None
+        )
+        .is_err());
+        assert!(write_artifact_content(
+            &st,
+            st.paths.claude_json.to_str().unwrap(),
+            "{}",
+            None
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn save_markdown_and_json() {
+        let (_d, st, proj) = fixture();
+        enable_editing(&st);
+        let skill = proj.join(".claude/skills/alpha/SKILL.md");
+        let skill_s = skill.to_str().unwrap();
+        let settings = proj.join(".claude/settings.json");
+        let settings_s = settings.to_str().unwrap();
+
+        let before = read_artifact_content_for_edit(&st, skill_s).unwrap();
+        let saved = write_artifact_content(
+            &st,
+            skill_s,
+            "---\ndescription: Updated\n---\nbody\n",
+            Some(&before.content_hash),
+        )
+        .unwrap();
+        assert!(saved.previous_content.contains("Alpha thing"));
+        assert_eq!(
+            fs::read_to_string(&skill).unwrap(),
+            "---\ndescription: Updated\n---\nbody\n"
+        );
+
+        let bad = write_artifact_content(&st, settings_s, "{not-json", None);
+        assert!(bad.is_err());
+        assert!(fs::read_to_string(&settings).unwrap().contains("supersecret"));
+
+        let ok = write_artifact_content(
+            &st,
+            settings_s,
+            r#"{"env":{"MY_TOKEN":"newsecret"}}"#,
+            None,
+        )
+        .unwrap();
+        assert!(ok.previous_content.contains("supersecret"));
+        assert_eq!(
+            fs::read_to_string(&settings).unwrap(),
+            r#"{"env":{"MY_TOKEN":"newsecret"}}"#
+        );
+    }
+
+    #[test]
+    fn save_hash_conflict() {
+        let (_d, st, proj) = fixture();
+        enable_editing(&st);
+        let settings = proj.join(".claude/settings.json");
+        let settings_s = settings.to_str().unwrap();
+        let before = read_artifact_content_for_edit(&st, settings_s).unwrap();
+        fs::write(&settings, r#"{"env":{"A":"changed"}}"#).unwrap();
+        let err = write_artifact_content(
+            &st,
+            settings_s,
+            r#"{"env":{"A":"mine"}}"#,
+            Some(&before.content_hash),
+        );
+        assert!(matches!(err, Err(AppError::Conflict(_))));
+        assert!(fs::read_to_string(&settings).unwrap().contains("changed"));
+    }
+
+    #[test]
+    fn rename_and_delete_artifact() {
+        let (d, st, proj) = fixture();
+        let skill_dir = proj.join(".claude/skills/alpha");
+        fs::write(skill_dir.join("notes.md"), "note").unwrap();
+        let notes = skill_dir.join("notes.md");
+        let notes_s = notes.to_str().unwrap();
+
+        assert!(rename_artifact_file(&st, notes_s, "renamed.md", None).is_err());
+        enable_editing(&st);
+
+        let before = read_artifact_content_for_edit(&st, notes_s).unwrap();
+        let renamed = rename_artifact_file(&st, notes_s, "renamed.md", Some(&before.content_hash))
+            .unwrap();
+        assert!(!notes.exists());
+        let new_path = PathBuf::from(&renamed.new_path);
+        assert!(new_path.exists());
+        assert_eq!(fs::read_to_string(&new_path).unwrap(), "note");
+
+        assert!(rename_artifact_file(
+            &st,
+            new_path.to_str().unwrap(),
+            "renamed.md",
+            None
+        )
+        .is_err()); // dest exists (same name) — conflict if we try another file; rename to existing:
+        fs::write(skill_dir.join("other.md"), "x").unwrap();
+        assert!(matches!(
+            rename_artifact_file(&st, skill_dir.join("other.md").to_str().unwrap(), "renamed.md", None),
+            Err(AppError::Conflict(_))
+        ));
+
+        // Outside allowlist dest (project root FOO.md)
+        let claude = proj.join("CLAUDE.md");
+        fs::write(&claude, "x").unwrap();
+        assert!(rename_artifact_file(&st, claude.to_str().unwrap(), "FOO.md", None).is_err());
+
+        assert!(delete_artifact_file(
+            &st,
+            st.paths.credentials_file().to_str().unwrap(),
+            None
+        )
+        .is_err());
+        assert!(delete_artifact_file(
+            &st,
+            d.path().join("outside.json").to_str().unwrap(),
+            None
+        )
+        .is_err());
+
+        let hash = read_artifact_content_for_edit(&st, new_path.to_str().unwrap())
+            .unwrap()
+            .content_hash;
+        fs::write(&new_path, "changed").unwrap();
+        assert!(matches!(
+            delete_artifact_file(&st, new_path.to_str().unwrap(), Some(&hash)),
+            Err(AppError::Conflict(_))
+        ));
+        assert!(new_path.exists());
+
+        delete_artifact_file(&st, new_path.to_str().unwrap(), None).unwrap();
+        assert!(!new_path.exists());
     }
 }
