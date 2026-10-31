@@ -1,104 +1,94 @@
 # Agent Scope
 
-Локальное macOS-приложение для **просмотра и анализа** конфигурации Claude Code и Cursor — глобальной и проектной областей. Запись существующих файлов из allowlist — **opt-in**.
+<p align="center">
+  <img src="src-tauri/icons/128x128.png" width="96" height="96" alt="Agent Scope">
+</p>
 
-**v0.3** — безопасное редактирование allowlisted конфигов (по умолчанию выключено).
+<p align="center">
+  <strong>See every Claude Code &amp; Cursor config in one place.</strong><br>
+  Local macOS app — scan, inspect conflicts, optionally edit allowlisted files.
+</p>
 
-Стек: **Tauri 2**, **Rust**, **Vue 3**, TypeScript, Tailwind.
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="docs/user-guide.md">User guide</a> ·
+  <a href="docs/ru/README.md">Русский</a> ·
+  <a href="https://github.com/NejaTive/agent-scope/releases">Releases</a>
+</p>
 
-## Что делает
+<p align="center">
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-11%2B%20Apple%20Silicon-111?style=flat-square">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-0a7?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/github/v/release/NejaTive/agent-scope?style=flat-square&label=release">
+  <img alt="Homebrew" src="https://img.shields.io/badge/homebrew-cask-fbb?style=flat-square">
+</p>
 
-- Сканирует `~/.claude` (или `CLAUDE_CONFIG_DIR`), `~/.cursor` и управляемые пути macOS
-- Находит проекты в выбранных корнях (или добавляет проект вручную)
-- Показывает Skills, Commands, Rules, Agents, Hooks, MCP, Plugins, Settings, Memory (`AGENTS.md`, `SKILL.md` и др.)
-- Обнаруживает конфликты (дубли имён, расхождения MCP, переопределения настроек)
-- Отслеживает файлы конфигурации и показывает недавние изменения
-- По желанию правит / переименовывает / удаляет **существующие** файлы из allowlist (markdown rules/skills/commands/agents/memory, JSON settings/MCP/hooks) — см. ниже
+<!-- Screenshots: add PNGs under docs/assets/ (see docs/assets/README.md), then uncomment:
+<p align="center">
+  <img src="docs/assets/dashboard.png" width="800" alt="Dashboard">
+</p>
+-->
 
-## Редактирование (opt-in)
+## Why Agent Scope
 
-1. В настройках приложения включите «Разрешить редактирование файлов конфигурации» (`allowEditing`, по умолчанию **выкл.**).
-2. Откройте артефакт → **Изменить** → правьте сырой файл → **Сохранить**; либо **Переименовать** / **Удалить**.
-3. Rename — только новое имя в **той же папке**; dest не должен существовать и должен оставаться в allowlist (например `CLAUDE.md` → `FOO.md` в корне проекта отклоняется).
-4. Delete — один файл (без рекурсии каталогов); из приложения не откатывается.
-5. В режиме правки секреты **не маскируются**. Не сохраняйте замаскированный просмотр с `***`.
-6. После save бэкенд возвращает предыдущий текст для одноуровневого undo в UI; `.bak` на диск **не** пишется. Undo для rename/delete нет.
-7. Diff настроек по областям — **только просмотр**.
+Claude Code and Cursor both scatter skills, rules, agents, hooks, MCP servers, and memory across global and project trees. Agent Scope gives you a single local UI to:
 
-Не трогаются: `.credentials.json`, `~/.claude.json`, managed/system пути, файлы вне allowlist. Не в MVP: создание артефактов с нуля, GUI-формы settings, запуск hooks/MCP.
+- **Inventory** everything under `~/.claude` / `CLAUDE_CONFIG_DIR`, `~/.cursor`, and the projects you add
+- **Spot conflicts** — duplicate names, MCP mismatches, setting overrides
+- **Track changes** after each scan
+- **Edit safely (opt-in)** — rename / delete / save only existing allowlisted files; credentials and managed paths stay untouched
 
-## Чего не делает
+Stack: **Tauri 2**, **Rust**, **Vue 3**, TypeScript, Tailwind.
 
-- Не создаёт новые артефакты с нуля; не пишет credentials и пути вне allowlist
-- Не запускает хуки, MCP-серверы и shell-команды из конфигов
-- По умолчанию (без Edit mode) не показывает незамаскированные секреты; credential-файлы не открывает
+## Install
 
-## Требования
-
-- macOS 11+ (Big Sur), **только Apple Silicon (aarch64)** — Intel не поддерживается
-- [Node.js](https://nodejs.org/) 20+
-- [Rust](https://rustup.rs/) stable
-- Xcode Command Line Tools
-
-## Установка / Homebrew
-
-Только Apple Silicon. Без нотаризации Gatekeeper может предупредить при первом запуске (Правый клик → Открыть, или снять quarantine через `xattr`).
+**Apple Silicon only** · macOS 11 (Big Sur)+
 
 ```bash
 brew tap nejative/agent-scope
 brew install --cask agent-scope
-# обновление
-brew upgrade --cask agent-scope
 ```
 
-Для мейнтейнеров: как обновлять tap и релизный чеклист — [docs/homebrew.md](docs/homebrew.md).
+Upgrade: `brew upgrade --cask agent-scope`
 
-## Разработка
+DMG downloads: [Releases](https://github.com/NejaTive/agent-scope/releases). First launch may need Right-click → **Open** if Gatekeeper warns (unsigned builds) — details in the [user guide](docs/user-guide.md#gatekeeper).
+
+## Features
+
+| | |
+|--|--|
+| **Overview dashboard** | Counts for projects, skills, rules, agents, hooks, MCP, plugins, memory |
+| **Global + project scope** | Browse user-level and per-repo artifacts side by side |
+| **Artifact browser** | Markdown / JSON viewers with search |
+| **Conflict detection** | Duplicate names, MCP drift, setting overrides |
+| **Change feed** | Recent created / modified / deleted config files |
+| **Opt-in editing** | Raw edit, same-folder rename, single-file delete — off by default |
+| **Secret masking** | Masked in view mode; unmasked only while editing |
+| **Update check** | Notices when a newer GitHub Release exists |
+
+**Does not:** create artifacts from scratch, run hooks/MCP/shell from configs, write credentials or paths outside the allowlist, or support Intel Macs.
+
+## Quick start (from source)
 
 ```bash
 npm install
 npm run tauri:dev
 ```
 
-Только фронтенд (без IPC):
+Tests: `cd src-tauri && cargo test` · frontend typecheck/build: `npm run build`  
+Release DMG: `npm run tauri:build` → `src-tauri/target/release/bundle/`
 
-```bash
-npm run dev
-```
+Full setup, editing rules, and data paths: **[docs/user-guide.md](docs/user-guide.md)**.
 
-## Тесты
+## Documentation
 
-```bash
-cd src-tauri && cargo test
-npm run build   # vue-tsc + vite
-```
+| Doc | |
+|-----|--|
+| [User guide](docs/user-guide.md) | Install, first scan, editing |
+| [Homebrew tap](docs/homebrew.md) | Maintainer release checklist |
+| [Claude Code map](docs/spec/claude-code.md) · [Cursor map](docs/spec/cursor.md) | Config layout specs |
+| [Русская документация](docs/ru/README.md) | README и гайды на русском |
 
-## Сборка macOS-приложения / DMG
+## License
 
-```bash
-npm run tauri:build
-```
-
-Артефакты: `src-tauri/target/release/bundle/` (`.app`, `.dmg`).
-
-### Замечания
-
-- При выборе корней сканирования / проектов нужно дать доступ к папкам (минимальный TCC; Full Disk Access для выбранных пользователем путей не требуется).
-- Первый скан больших деревьев может занять несколько секунд; исключаются: `node_modules`, `target`, `dist`, `build`, `.git` и т.п.
-
-## Данные приложения
-
-SQLite (предпочтения / корни сканирования / история изменений):
-
-`~/Library/Application Support/com.agentscope.desktop/agent-scope.sqlite`
-
-Конфиги Claude Code и Cursor остаются в исходных файлах.
-
-## Спецификация
-
-- [docs/spec/claude-code.md](docs/spec/claude-code.md) — карта конфигурации Claude Code
-- [docs/spec/cursor.md](docs/spec/cursor.md) — карта конфигурации Cursor
-
-## Лицензия
-
-Private / pet project, если не указано иное.
+[MIT](LICENSE) © Alexandr Sharov

@@ -2,6 +2,8 @@
   "name": "agent-scope",
   "private": true,
   "version": "0.3.2",
+  "license": "MIT",
+  "description": "Local macOS app to inspect and optionally edit Claude Code and Cursor agent configuration",
   "type": "module",
   "scripts": {
     "dev": "vite",

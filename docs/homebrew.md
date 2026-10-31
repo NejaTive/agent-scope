@@ -1,5 +1,7 @@
 # Homebrew (cask)
 
+> Docs index: [README.md](README.md) · User install: [user-guide.md](user-guide.md)
+
 Пользовательский tap: `brew tap nejative/agent-scope` → репозиторий [NejaTive/homebrew-agent-scope](https://github.com/NejaTive/homebrew-agent-scope).
 
 Cask token: `agent-scope`. Установка только на **Apple Silicon (aarch64)**; Intel не поддерживается.
