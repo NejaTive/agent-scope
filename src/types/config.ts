@@ -314,6 +314,8 @@ export interface DeleteArtifactResult {
 export interface AppInfo {
   name: string;
   version: string;
+  /** Host OS from the native shell: `macos` | `windows` | `linux` | `unknown`. */
+  platform: string;
 }
 
 /** Result of `check_for_updates` (GitHub latest release vs installed version). */

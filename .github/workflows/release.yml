@@ -1,12 +1,15 @@
-# Release macOS DMG on version tags (v*).
+# Release macOS DMG + Windows NSIS installers on version tags (v*).
 #
 # Optional Apple signing / notarization secrets (repo Settings → Secrets).
-# Without them the job still builds an unsigned/ad-hoc DMG and publishes a Release.
+# Without them the macOS job still builds an unsigned/ad-hoc DMG.
 #   APPLE_CERTIFICATE              # base64-encoded Developer ID .p12
 #   APPLE_CERTIFICATE_PASSWORD
 #   APPLE_ID
 #   APPLE_TEAM_ID
 #   APPLE_APP_SPECIFIC_PASSWORD    # or App Store Connect API key instead
+#
+# Windows builds ship unsigned NSIS installers (x64 + ARM64). Authenticode
+# signing can be added later via secrets without changing the job layout.
 
 name: Release
 
@@ -19,7 +22,46 @@ permissions:
   contents: write
 
 jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Version from tag
+        id: meta
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Agent Scope ${{ steps.meta.outputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            Desktop builds for this tag:
+
+            | Platform | Asset |
+            | --- | --- |
+            | macOS Apple Silicon | `Agent.Scope_${{ steps.meta.outputs.version }}_aarch64.dmg` |
+            | Windows x64 | `Agent.Scope_${{ steps.meta.outputs.version }}_x64-setup.exe` |
+            | Windows ARM64 | `Agent.Scope_${{ steps.meta.outputs.version }}_aarch64-setup.exe` |
+
+            **macOS (Homebrew)** — after updating the tap cask `sha256` / `version`:
+            ```bash
+            brew tap nejative/agent-scope
+            brew install --cask agent-scope
+            ```
+
+            **Windows** — download the NSIS installer for your CPU architecture from
+            the assets below. WebView2 is required (included with Windows 10/11 in
+            most cases; the installer can bootstrap it when missing).
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   release-macos:
+    needs: prepare-release
     runs-on: macos-15
     steps:
       - name: Checkout
@@ -79,7 +121,7 @@ jobs:
         id: dmg
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${{ needs.prepare-release.outputs.version }}"
           # No spaces: GitHub Release rewrites spaces in asset names to dots.
           STABLE_NAME="Agent.Scope_${VERSION}_aarch64.dmg"
           BUNDLE_DMG_DIR="src-tauri/target/release/bundle/dmg"
@@ -114,27 +156,110 @@ jobs:
           echo "path=${STABLE_PATH}" >> "$GITHUB_OUTPUT"
           echo "name=${STABLE_NAME}" >> "$GITHUB_OUTPUT"
           echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub Release
+      - name: Upload macOS DMG
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: Agent Scope ${{ steps.dmg.outputs.version }}
-          draft: false
-          prerelease: false
-          generate_release_notes: true
           files: ${{ steps.dmg.outputs.path }}
-          body: |
-            macOS Apple Silicon (aarch64) DMG.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-            **Asset:** `Agent.Scope_${{ steps.dmg.outputs.version }}_aarch64.dmg`
-            **sha256:** `${{ steps.dmg.outputs.sha256 }}`
+  release-windows:
+    needs: prepare-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            arch: x64
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            arch: aarch64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-            Homebrew: after updating the tap cask `sha256` / `version`, users can:
-            ```bash
-            brew tap nejative/agent-scope
-            brew install --cask agent-scope
-            ```
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Setup Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install frontend dependencies
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Build Tauri app (NSIS)
+        shell: bash
+        run: npm run tauri:build -- --target ${{ matrix.target }}
+
+      - name: Locate NSIS installer, checksum, stabilize filename
+        id: nsis
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          ARCH="${{ matrix.arch }}"
+          TARGET="${{ matrix.target }}"
+          STABLE_NAME="Agent.Scope_${VERSION}_${ARCH}-setup.exe"
+          BUNDLE_DIR="src-tauri/target/${TARGET}/release/bundle"
+
+          echo "Looking for NSIS under ${BUNDLE_DIR}..."
+          EXE_PATH="$(find "${BUNDLE_DIR}" -type f \( -name '*-setup.exe' -o -name '*setup.exe' \) | head -n 1 || true)"
+          if [ -z "${EXE_PATH}" ]; then
+            echo "::error::No NSIS setup.exe found under ${BUNDLE_DIR}"
+            ls -laR "${BUNDLE_DIR}" || true
+            exit 1
+          fi
+          echo "Found: ${EXE_PATH}"
+
+          OUT_DIR="$(dirname "${EXE_PATH}")"
+          STABLE_PATH="${OUT_DIR}/${STABLE_NAME}"
+          if [ "$(basename "${EXE_PATH}")" != "${STABLE_NAME}" ]; then
+            cp "${EXE_PATH}" "${STABLE_PATH}"
+          fi
+
+          if command -v sha256sum >/dev/null 2>&1; then
+            SHA256="$(sha256sum "${STABLE_PATH}" | awk '{print $1}')"
+          elif command -v shasum >/dev/null 2>&1; then
+            SHA256="$(shasum -a 256 "${STABLE_PATH}" | awk '{print $1}')"
+          else
+            WIN_PATH="$(cygpath -w "${STABLE_PATH}")"
+            SHA256="$(powershell.exe -NoProfile -Command "(Get-FileHash -LiteralPath '${WIN_PATH}' -Algorithm SHA256).Hash.ToLower()")"
+            SHA256="$(echo "${SHA256}" | tr -d '\r\n')"
+          fi
+          echo "NSIS: ${STABLE_PATH}"
+          echo "sha256: ${SHA256}"
+
+          {
+            echo "## Windows ${ARCH} NSIS"
+            echo ""
+            echo "- **Asset:** \`${STABLE_NAME}\`"
+            echo "- **sha256:** \`${SHA256}\`"
+            echo "- **Tag:** \`${GITHUB_REF_NAME}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "path=${STABLE_PATH}" >> "$GITHUB_OUTPUT"
+          echo "name=${STABLE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Windows NSIS
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: ${{ steps.nsis.outputs.path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

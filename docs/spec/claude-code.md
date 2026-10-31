@@ -15,7 +15,7 @@ Agent Scope treats Anthropic docs as source of truth. When formats drift, update
 
 | Scope | File |
 |-------|------|
-| Managed | `/Library/Application Support/ClaudeCode/managed-settings.json` (macOS) |
+| Managed | macOS: `/Library/Application Support/ClaudeCode/managed-settings.json`; Linux/WSL: `/etc/claude-code/managed-settings.json`; Windows: `C:\Program Files\ClaudeCode\managed-settings.json` |
 | Project local | `.claude/settings.local.json` |
 | Project | `.claude/settings.json` |
 | User | `~/.claude/settings.json` |

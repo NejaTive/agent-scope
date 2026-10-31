@@ -531,6 +531,8 @@ pub struct DeleteArtifactResult {
 pub struct AppInfo {
     pub name: String,
     pub version: String,
+    /// Host OS for UI copy (`macos` | `windows` | `linux` | `unknown`).
+    pub platform: String,
 }
 
 /// Result of checking GitHub Releases for a newer app version.

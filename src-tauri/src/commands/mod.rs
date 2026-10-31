@@ -41,7 +41,20 @@ fn validate_dir(path: &str) -> AppResult<PathBuf> {
 
 #[tauri::command]
 pub fn get_app_info() -> AppInfo {
-    AppInfo { name: "Agent Scope".into(), version: env!("CARGO_PKG_VERSION").into() }
+    let platform = if cfg!(target_os = "macos") {
+        "macos"
+    } else if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "linux") {
+        "linux"
+    } else {
+        "unknown"
+    };
+    AppInfo {
+        name: "Agent Scope".into(),
+        version: env!("CARGO_PKG_VERSION").into(),
+        platform: platform.into(),
+    }
 }
 
 /// Query GitHub Releases for a newer version. Soft errors are returned in the
@@ -584,7 +597,15 @@ mod tests {
 
     #[test]
     fn app_info_name() {
-        assert_eq!(get_app_info().name, "Agent Scope");
+        let info = get_app_info();
+        assert_eq!(info.name, "Agent Scope");
+        assert!(!info.platform.is_empty());
+        #[cfg(target_os = "macos")]
+        assert_eq!(info.platform, "macos");
+        #[cfg(target_os = "windows")]
+        assert_eq!(info.platform, "windows");
+        #[cfg(target_os = "linux")]
+        assert_eq!(info.platform, "linux");
     }
 
     #[test]

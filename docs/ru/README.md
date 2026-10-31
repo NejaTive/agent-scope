@@ -7,7 +7,7 @@
 <h3 align="center">Вся конфигурация AI-инструментов — в одном месте.</h3>
 
 <p align="center">
-  MacOS-приложение для просмотра, анализа и управления настройками AI-инструментов для разработки.
+  Десктопное приложение для просмотра, анализа и управления настройками AI-инструментов для разработки.
 </p>
 
 <p align="center">
@@ -43,6 +43,8 @@ Claude Code, Cursor и другие AI-инструменты использую
 
 ## Установка
 
+### macOS
+
 **Требования:** macOS 11 (Big Sur) или новее · Apple Silicon
 
 Самый простой способ установить Agent Scope — через Homebrew:
@@ -63,6 +65,21 @@ brew trust --cask nejative/agent-scope/agent-scope
 ```bash
 brew install --cask agent-scope
 ```
+
+Также можно скачать DMG со страницы [GitHub Releases](https://github.com/NejaTive/agent-scope/releases).
+
+**Первый запуск:** если macOS показывает предупреждение Gatekeeper, открой приложение через правый клик → **Открыть**.
+
+### Windows
+
+**Требования:** Windows 10 или новее · x64 или ARM64 · WebView2 (обычно уже установлен)
+
+Скачай NSIS-установщик под свой процессор со страницы [GitHub Releases](https://github.com/NejaTive/agent-scope/releases):
+
+- `Agent.Scope_*_x64-setup.exe` — Intel/AMD 64-bit
+- `Agent.Scope_*_aarch64-setup.exe` — ARM64 (Snapdragon / Copilot+ PC)
+
+Запусти установщик и открой **Agent Scope** из меню «Пуск».
 
 ## Возможности
 
@@ -119,7 +136,7 @@ Agent Scope предназначен прежде всего для просмо
 
 ### Локальная работа и безопасность
 
-Agent Scope — локальное приложение для macOS.
+Agent Scope — локальное десктопное приложение.
 
 - Сканирование конфигураций выполняется локально.
 - Не требуется подключение к AI-сервисам или облачным аккаунтам.
@@ -136,13 +153,13 @@ Agent Scope — локальное приложение для macOS.
 
 **Обновление** до последней версии:
 
+- **macOS (Homebrew):**
+
 ```bash
 brew upgrade --cask agent-scope
 ```
 
-Также можно скачать DMG непосредственно со страницы [GitHub Releases](https://github.com/NejaTive/agent-scope/releases).
-
-**Первый запуск:** если macOS показывает предупреждение Gatekeeper, открой приложение через правый клик → **Открыть**.
+- **Windows / macOS (вручную):** скачай новый установщик или DMG со страницы [GitHub Releases](https://github.com/NejaTive/agent-scope/releases).
 
 ## Ограничения
 
@@ -153,7 +170,7 @@ Agent Scope сосредоточен на просмотре и безопасн
 - Создания новых skills, agents, rules и других артефактов.
 - Запуска hooks, MCP-серверов или shell-команд из конфигурационных файлов.
 - Изменения credentials и файлов за пределами allowlist.
-- Работы на Mac с процессорами Intel.
+- Работы на Mac с процессорами Intel (на macOS — только Apple Silicon).
 
 ## Технологии
 
@@ -192,16 +209,23 @@ cargo test
 npm run build
 ```
 
-Сборка macOS-приложения:
+Сборка десктопного приложения (DMG на macOS, NSIS на Windows):
 
 ```bash
 npm run tauri:build
 ```
 
-Готовые DMG и другие артефакты сборки находятся в:
+Готовые установщики и другие артефакты сборки находятся в:
 
 ```text
 src-tauri/target/release/bundle/
+```
+
+Пример сборки под Windows-таргеты:
+
+```bash
+npm run tauri:build -- --target x86_64-pc-windows-msvc
+npm run tauri:build -- --target aarch64-pc-windows-msvc
 ```
 
 ## Документация

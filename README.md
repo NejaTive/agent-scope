@@ -7,7 +7,7 @@
 <h3 align="center">All your AI tooling config — in one place.</h3>
 
 <p align="center">
-  A macOS app for viewing, analyzing, and managing configuration for AI development tools.
+  A desktop app for viewing, analyzing, and managing configuration for AI development tools.
 </p>
 
 <p align="center">
@@ -43,6 +43,8 @@ No more digging through dozens of hidden directories by hand.
 
 ## Install
 
+### macOS
+
 **Requirements:** macOS 11 (Big Sur) or newer · Apple Silicon
 
 The easiest way to install Agent Scope is with Homebrew:
@@ -63,6 +65,21 @@ Then install again:
 ```bash
 brew install --cask agent-scope
 ```
+
+You can also download a DMG from [GitHub Releases](https://github.com/NejaTive/agent-scope/releases).
+
+**First launch:** if macOS shows a Gatekeeper warning, open the app via Right-click → **Open**.
+
+### Windows
+
+**Requirements:** Windows 10 or newer · x64 or ARM64 · WebView2 (usually preinstalled)
+
+Download the NSIS installer for your CPU from [GitHub Releases](https://github.com/NejaTive/agent-scope/releases):
+
+- `Agent.Scope_*_x64-setup.exe` — Intel/AMD 64-bit
+- `Agent.Scope_*_aarch64-setup.exe` — ARM64 (Snapdragon / Copilot+ PCs)
+
+Run the installer and launch **Agent Scope** from the Start menu.
 
 ## Features
 
@@ -119,7 +136,7 @@ With editing enabled you can:
 
 ### Local and secure
 
-Agent Scope is a local macOS app.
+Agent Scope is a local desktop app.
 
 - Config scanning runs locally.
 - No AI service or cloud account is required.
@@ -136,13 +153,13 @@ Agent Scope is a local macOS app.
 
 **Upgrade** to the latest version:
 
+- **macOS (Homebrew):**
+
 ```bash
 brew upgrade --cask agent-scope
 ```
 
-You can also download a DMG from [GitHub Releases](https://github.com/NejaTive/agent-scope/releases).
-
-**First launch:** if macOS shows a Gatekeeper warning, open the app via Right-click → **Open**.
+- **Windows / macOS (manual):** download the newest installer or DMG from [GitHub Releases](https://github.com/NejaTive/agent-scope/releases).
 
 ## Limitations
 
@@ -153,7 +170,7 @@ It is not meant for:
 - Creating new skills, agents, rules, and other artifacts from scratch.
 - Running hooks, MCP servers, or shell commands from config files.
 - Changing credentials or files outside the allowlist.
-- Running on Intel Macs.
+- Running on Intel Macs (Apple Silicon only on macOS).
 
 ## Tech stack
 
@@ -192,16 +209,23 @@ Build the frontend:
 npm run build
 ```
 
-Build the macOS app:
+Build the desktop app (DMG on macOS, NSIS on Windows):
 
 ```bash
 npm run tauri:build
 ```
 
-Built DMGs and other artifacts are under:
+Built installers and other artifacts are under:
 
 ```text
 src-tauri/target/release/bundle/
+```
+
+Cross-target Windows example:
+
+```bash
+npm run tauri:build -- --target x86_64-pc-windows-msvc
+npm run tauri:build -- --target aarch64-pc-windows-msvc
 ```
 
 ## Documentation

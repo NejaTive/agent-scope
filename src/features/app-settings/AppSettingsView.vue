@@ -343,11 +343,17 @@ async function openRelease() {
           </div>
           <p v-if="statusText" class="text-xs" :class="statusTone">{{ statusText }}</p>
           <p
-            v-if="updates.updateAvailable"
+            v-if="updates.updateAvailable && scan.appInfo?.platform === 'macos'"
             class="text-2xs text-subtle"
           >
             Через Homebrew:
             <code class="font-mono text-muted">brew upgrade --cask agent-scope</code>
+          </p>
+          <p
+            v-else-if="updates.updateAvailable && scan.appInfo?.platform === 'windows'"
+            class="text-2xs text-subtle"
+          >
+            Скачай новый установщик с страницы релиза.
           </p>
         </div>
         <p class="mt-2 flex items-center gap-1.5 text-2xs text-subtle">

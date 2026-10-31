@@ -77,7 +77,7 @@ pub struct Paths {
     pub cursor_mcp_json: PathBuf,
     /// `~/.cursor/hooks.json`
     pub cursor_hooks_json: PathBuf,
-    /// Managed Cursor hooks (macOS `/Library/Application Support/Cursor/hooks.json`).
+    /// Managed Cursor hooks (macOS Application Support / Windows ProgramData / Linux `/etc`).
     pub cursor_managed_hooks: PathBuf,
 }
 
@@ -105,7 +105,7 @@ pub fn cursor_managed_hooks_default() -> PathBuf {
     if cfg!(target_os = "macos") {
         PathBuf::from("/Library/Application Support/Cursor/hooks.json")
     } else if cfg!(target_os = "windows") {
-        PathBuf::from("C:\\Program Files\\Cursor\\hooks.json")
+        PathBuf::from("C:\\ProgramData\\Cursor\\hooks.json")
     } else {
         PathBuf::from("/etc/cursor/hooks.json")
     }
@@ -654,6 +654,40 @@ mod tests {
         assert_eq!(paths.cursor_mcp_json, dir.path().join(".cursor/mcp.json"));
         assert_eq!(paths.cursor_hooks_json, dir.path().join(".cursor/hooks.json"));
         assert_eq!(paths.cursor_managed_hooks, dir.path().join("managed-cursor/hooks.json"));
+    }
+
+    #[test]
+    fn managed_defaults_match_host_os() {
+        #[cfg(target_os = "macos")]
+        {
+            assert_eq!(
+                managed_dir_default(),
+                PathBuf::from("/Library/Application Support/ClaudeCode")
+            );
+            assert_eq!(
+                cursor_managed_hooks_default(),
+                PathBuf::from("/Library/Application Support/Cursor/hooks.json")
+            );
+        }
+        #[cfg(target_os = "windows")]
+        {
+            assert_eq!(
+                managed_dir_default(),
+                PathBuf::from(r"C:\Program Files\ClaudeCode")
+            );
+            assert_eq!(
+                cursor_managed_hooks_default(),
+                PathBuf::from(r"C:\ProgramData\Cursor\hooks.json")
+            );
+        }
+        #[cfg(all(unix, not(target_os = "macos")))]
+        {
+            assert_eq!(managed_dir_default(), PathBuf::from("/etc/claude-code"));
+            assert_eq!(
+                cursor_managed_hooks_default(),
+                PathBuf::from("/etc/cursor/hooks.json")
+            );
+        }
     }
 
     #[test]
