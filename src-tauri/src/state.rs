@@ -5,6 +5,7 @@ use crate::models::*;
 use crate::paths::Paths;
 use crate::scanner::{self, discovery, ScanContext, ScanInput};
 use crate::storage::Storage;
+use crate::tooling::ToolingFilter;
 use crate::watcher::{self, WatcherHandle};
 use parking_lot::Mutex;
 use sha2::{Digest, Sha256};
@@ -39,12 +40,22 @@ impl AppState {
         *self.snapshot.lock() = None;
     }
 
+    pub fn tooling_filter(&self) -> ToolingFilter {
+        self.db
+            .lock()
+            .get_preferences()
+            .map(|p| ToolingFilter::from_prefs(&p))
+            .unwrap_or_default()
+    }
+
     fn scan_input(&self) -> AppResult<ScanInput> {
         let db = self.db.lock();
+        let prefs = db.get_preferences()?;
         Ok(ScanInput {
             scan_roots: db.list_scan_roots()?.into_iter().map(PathBuf::from).collect(),
             pinned: db.list_projects()?.into_iter().map(PathBuf::from).collect(),
             max_depth: scanner::DEFAULT_MAX_DEPTH,
+            filter: ToolingFilter::from_prefs(&prefs),
         })
     }
 
@@ -114,11 +125,17 @@ impl AppState {
         if !canon.is_dir() {
             return Err(AppError::NotFound(path.to_string()));
         }
-        Ok(scanner::scan_project_with(&ScanContext::load(&self.paths), &canon))
+        let filter = self.tooling_filter();
+        Ok(scanner::scan_project_with(
+            &ScanContext::load(&self.paths),
+            &canon,
+            &filter,
+        ))
     }
 
     pub fn start_watching(&self, app: &AppHandle) -> AppResult<Vec<String>> {
         let roots = self.project_roots();
+        let filter = self.tooling_filter();
         let state = self.clone();
         let app = app.clone();
         let sink: watcher::Sink = Arc::new(move |ev: ChangeEvent| {
@@ -144,7 +161,7 @@ impl AppState {
                     .show();
             }
         });
-        let handle = watcher::start(self.paths.clone(), roots, sink)?;
+        let handle = watcher::start(self.paths.clone(), roots, filter, sink)?;
         let targets = handle.targets.iter().map(|p| p.to_string_lossy().to_string()).collect();
         *self.watcher.lock() = Some(handle);
         Ok(targets)

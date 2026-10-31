@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import type { BrowserItem } from "@/lib/browser";
+import { trackedPathHint } from "@/lib/tooling";
 import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
 import FieldList from "@/components/common/FieldList.vue";
 
 const scan = useScanStore();
+const prefs = usePreferencesStore();
 const byId = computed(() => new Map(scan.agents.map((a) => [a.id, a])));
 
 const items = computed<BrowserItem[]>(() =>
@@ -24,6 +27,11 @@ const items = computed<BrowserItem[]>(() =>
     searchText: [a.model, ...(a.tools ?? [])].filter(Boolean).join(" "),
   })),
 );
+
+const emptyDescription = computed(
+  () =>
+    `Субагенты лежат в ${trackedPathHint(prefs.prefs, "agents/*.md")} на уровне пользователя или проекта.`,
+);
 </script>
 
 <template>
@@ -31,7 +39,7 @@ const items = computed<BrowserItem[]>(() =>
     :items="items"
     :loading="!scan.initialized"
     empty-title="Агенты не найдены"
-    empty-description="Субагенты лежат в .claude/agents/*.md и .cursor/agents/*.md на уровне пользователя или проекта."
+    :empty-description="emptyDescription"
   >
     <template #detail="{ item }">
       <FieldList

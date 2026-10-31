@@ -2,8 +2,13 @@
 
 use super::*;
 use crate::parser::MASK;
+use crate::tooling::ToolingFilter;
 use std::fs;
 use tempfile::tempdir;
+
+fn all_filter() -> ToolingFilter {
+    ToolingFilter::all()
+}
 
 fn w(p: &Path, s: &str) {
     fs::create_dir_all(p.parent().unwrap()).unwrap();
@@ -21,7 +26,7 @@ fn find<'a>(c: &'a Collection, kind: ArtifactKind, name: &str) -> &'a ConfigArti
 fn empty_home_is_ok() {
     let d = tempdir().unwrap();
     let paths = Paths::for_root(d.path());
-    let g = scan_global_with(&ScanContext::load(&paths));
+    let g = scan_global_with(&ScanContext::load(&paths), &all_filter());
     assert!(g.items.errors.is_empty());
     assert!(!g.credentials_present);
     // Absent optional files are not listed as missing placeholders.
@@ -40,7 +45,7 @@ fn corrupted_json_reported() {
     let paths = Paths::for_root(d.path());
     w(&paths.config_dir.join("settings.json"), "{ not json");
     w(&paths.claude_json, "[[[");
-    let g = scan_global_with(&ScanContext::load(&paths));
+    let g = scan_global_with(&ScanContext::load(&paths), &all_filter());
     assert_eq!(find(&g.items, ArtifactKind::Settings, "settings.json").status, DiscoveryStatus::InvalidJson);
     assert_eq!(find(&g.items, ArtifactKind::Other, ".claude.json").status, DiscoveryStatus::InvalidJson);
     assert_eq!(g.items.errors.len(), 2);
@@ -75,7 +80,7 @@ fn global_collects_everything() {
         "projects":{"/p":{"mcpServers":{}}}}"#);
     w(&paths.managed_dir.join("managed-settings.json"), r#"{"model":"sonnet"}"#);
 
-    let g = scan_global_with(&ScanContext::load(&paths));
+    let g = scan_global_with(&ScanContext::load(&paths), &all_filter());
     let c = &g.items;
     assert!(g.credentials_present);
     assert!(c.errors.iter().any(|e| e.path.ends_with("bad.md")) );
@@ -152,7 +157,7 @@ fn project_scan_collects_scopes() {
         canon.display()
     ));
 
-    let b = scan_project_with(&ScanContext::load(&paths), &proj);
+    let b = scan_project_with(&ScanContext::load(&paths), &proj, &all_filter());
     let c = &b.items;
     assert_eq!(b.project.path, canon.to_string_lossy());
     assert!(b.project.has_claude_dir && b.project.has_claude_md && b.project.has_mcp_json);
@@ -193,6 +198,7 @@ fn scan_all_dedupes_and_resolves() {
         scan_roots: vec![d.path().join("code"), d.path().join("code")],
         pinned: vec![proj.clone(), d.path().join("gone")],
         max_depth: 3,
+        filter: all_filter(),
     };
     let snap = scan_all(&paths, &input);
     assert_eq!(snap.projects.len(), 1);
@@ -259,7 +265,7 @@ fn cursor_global_collects_rules_skills_hooks_mcp() {
         "---\nname: shared\ndescription: Claude owned\n---\n",
     );
 
-    let g = scan_global_with(&ScanContext::load(&paths));
+    let g = scan_global_with(&ScanContext::load(&paths), &all_filter());
     let c = &g.items;
 
     let rules: Vec<_> = c.artifacts.iter().filter(|a| a.kind == ArtifactKind::Rule && a.product == Tooling::Cursor).collect();
@@ -317,7 +323,7 @@ fn cursor_project_dedupes_agents_md_and_claude_skills() {
         r#"{"version":1,"hooks":{"sessionEnd":[{"command":".cursor/hooks/audit.sh"}]}}"#,
     );
 
-    let b = scan_project_with(&ScanContext::load(&paths), &proj);
+    let b = scan_project_with(&ScanContext::load(&paths), &proj, &all_filter());
     let c = &b.items;
 
     let agents: Vec<_> = c.artifacts.iter().filter(|a| a.name == "AGENTS.md").collect();
@@ -363,8 +369,64 @@ fn cursor_only_project_picks_up_agents_md() {
     w(&proj.join("AGENTS.md"), "cursor agents");
     w(&proj.join(".cursor/rules/r.mdc"), "---\nalwaysApply: true\n---\nx\n");
 
-    let b = scan_project_with(&ScanContext::load(&paths), &proj);
+    let b = scan_project_with(&ScanContext::load(&paths), &proj, &all_filter());
     assert!(b.items.artifacts.iter().any(|a| a.product == Tooling::Cursor && a.kind == ArtifactKind::Rule));
     let agents = b.items.artifacts.iter().filter(|a| a.name == "AGENTS.md").count();
     assert_eq!(agents, 1);
+}
+
+#[test]
+fn filter_skips_disabled_product_collectors() {
+    let d = tempdir().unwrap();
+    let paths = Paths::for_root(d.path());
+    w(&paths.config_dir.join("settings.json"), r#"{"model":"opus"}"#);
+    w(&paths.config_dir.join("skills/pdf/SKILL.md"), "---\nname: pdf\ndescription: Claude\n---\n");
+    w(&paths.cursor_dir.join("rules/style.mdc"), "---\nalwaysApply: true\n---\nx\n");
+    w(&paths.cursor_dir.join("skills/ship/SKILL.md"), "---\nname: ship\ndescription: Cursor\n---\n");
+    w(&paths.claude_json, r#"{"mcpServers":{"gh":{"command":"npx"}}}"#);
+
+    let proj = d.path().join("app");
+    w(&proj.join(".claude/settings.json"), r#"{"model":"p"}"#);
+    w(&proj.join(".claude/skills/c/SKILL.md"), "---\nname: c\ndescription: C\n---\n");
+    w(&proj.join(".cursor/rules/r.mdc"), "---\nalwaysApply: true\n---\nr\n");
+    w(&proj.join(".cursor/skills/s/SKILL.md"), "---\nname: s\ndescription: S\n---\n");
+
+    let ctx = ScanContext::load(&paths);
+
+    let claude_only = ToolingFilter {
+        claude: true,
+        cursor: false,
+    };
+    let g = scan_global_with(&ctx, &claude_only);
+    assert!(g.items.artifacts.iter().any(|a| a.product == Tooling::Claude && a.kind == ArtifactKind::Skill));
+    assert!(!g.items.artifacts.iter().any(|a| a.product == Tooling::Cursor));
+    assert!(g.items.mcp_servers.iter().any(|m| m.name == "gh"));
+    let b = scan_project_with(&ctx, &proj, &claude_only);
+    assert!(b.items.artifacts.iter().any(|a| a.product == Tooling::Claude));
+    assert!(!b.items.artifacts.iter().any(|a| a.product == Tooling::Cursor));
+
+    let cursor_only = ToolingFilter {
+        claude: false,
+        cursor: true,
+    };
+    let g = scan_global_with(&ctx, &cursor_only);
+    assert!(!g.items.artifacts.iter().any(|a| a.product == Tooling::Claude));
+    assert!(g.items.artifacts.iter().any(|a| a.product == Tooling::Cursor && a.kind == ArtifactKind::Rule));
+    assert!(g.items.mcp_servers.is_empty());
+    assert!(!g.credentials_present);
+    let b = scan_project_with(&ctx, &proj, &cursor_only);
+    assert!(!b.items.artifacts.iter().any(|a| a.product == Tooling::Claude));
+    assert!(b.items.artifacts.iter().any(|a| a.product == Tooling::Cursor));
+
+    let both = scan_all(
+        &paths,
+        &ScanInput {
+            scan_roots: vec![d.path().to_path_buf()],
+            pinned: vec![],
+            max_depth: 3,
+            filter: all_filter(),
+        },
+    );
+    assert!(both.global.items.artifacts.iter().any(|a| a.product == Tooling::Claude));
+    assert!(both.global.items.artifacts.iter().any(|a| a.product == Tooling::Cursor));
 }

@@ -3,6 +3,7 @@
 use crate::errors::AppResult;
 use crate::models::ChangeEvent;
 use crate::paths::{is_skipped_dir, Paths, PROJECT_FILE_NAMES};
+use crate::tooling::ToolingFilter;
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -31,8 +32,11 @@ pub fn kind_str(kind: &EventKind) -> Option<&'static str> {
     }
 }
 
+/// Claude-ish project root files (not shared with Cursor).
+const CLAUDE_PROJECT_FILES: &[&str] = &["CLAUDE.md", "CLAUDE.local.md", ".mcp.json"];
+
 /// Which changed paths are worth reporting.
-pub fn is_relevant(path: &Path, paths: &Paths, project_roots: &[PathBuf]) -> bool {
+pub fn is_relevant(path: &Path, paths: &Paths, project_roots: &[PathBuf], filter: &ToolingFilter) -> bool {
     let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
     if name == ".DS_Store" || name == ".credentials.json" || name.ends_with('~') || name.ends_with(".swp")
         || name.ends_with(".tmp") || name.starts_with(".#")
@@ -42,51 +46,64 @@ pub fn is_relevant(path: &Path, paths: &Paths, project_roots: &[PathBuf]) -> boo
     if path.components().any(|c| is_skipped_dir(&c.as_os_str().to_string_lossy())) {
         return false;
     }
-    if path == paths.claude_json {
-        return true;
-    }
-    if let Ok(rel) = path.strip_prefix(&paths.config_dir) {
-        let comps: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
-        return match comps.first().map(|s| s.as_str()) {
-            Some("projects") => comps.iter().any(|c| c == "memory"),
-            Some("settings.json") | Some("CLAUDE.md") | Some("rules") | Some("skills") | Some("commands")
-            | Some("agents") | Some("output-styles") | Some("workflows") | Some("plugins") => true,
-            _ => false,
-        };
-    }
-    if path.starts_with(&paths.managed_dir) {
-        return true;
-    }
-    if path == paths.cursor_hooks_json || path == paths.cursor_mcp_json || path == paths.cursor_managed_hooks {
-        return true;
-    }
-    if let Ok(rel) = path.strip_prefix(&paths.cursor_dir) {
-        let comps: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
-        return matches!(
-            comps.first().map(|s| s.as_str()),
-            Some("rules") | Some("skills") | Some("commands") | Some("agents") | Some("hooks")
-                | Some("hooks.json") | Some("mcp.json")
-        );
-    }
-    // User-level `~/.agents/skills`
-    if let Ok(rel) = path.strip_prefix(&paths.home.join(".agents")) {
-        let comps: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
-        if comps.first().map(|s| s.as_str()) == Some("skills") {
+    if filter.claude {
+        if path == paths.claude_json {
             return true;
+        }
+        if let Ok(rel) = path.strip_prefix(&paths.config_dir) {
+            let comps: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
+            return match comps.first().map(|s| s.as_str()) {
+                Some("projects") => comps.iter().any(|c| c == "memory"),
+                Some("settings.json") | Some("CLAUDE.md") | Some("rules") | Some("skills") | Some("commands")
+                | Some("agents") | Some("output-styles") | Some("workflows") | Some("plugins") => true,
+                _ => false,
+            };
+        }
+        if path.starts_with(&paths.managed_dir) {
+            return true;
+        }
+    }
+    if filter.cursor {
+        if path == paths.cursor_hooks_json || path == paths.cursor_mcp_json || path == paths.cursor_managed_hooks {
+            return true;
+        }
+        if let Ok(rel) = path.strip_prefix(&paths.cursor_dir) {
+            let comps: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
+            return matches!(
+                comps.first().map(|s| s.as_str()),
+                Some("rules") | Some("skills") | Some("commands") | Some("agents") | Some("hooks")
+                    | Some("hooks.json") | Some("mcp.json")
+            );
+        }
+    }
+    // User-level `~/.agents/skills` — shared; keep if either product is enabled.
+    if filter.claude || filter.cursor {
+        if let Ok(rel) = path.strip_prefix(&paths.home.join(".agents")) {
+            let comps: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
+            if comps.first().map(|s| s.as_str()) == Some("skills") {
+                return true;
+            }
         }
     }
     for root in project_roots {
         if let Ok(rel) = path.strip_prefix(root) {
             let comps: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
             let first = comps.first().map(|s| s.as_str());
-            if first == Some(".claude") || first == Some(".cursor") {
-                return true;
+            if first == Some(".claude") {
+                return filter.claude;
+            }
+            if first == Some(".cursor") {
+                return filter.cursor;
             }
             if first == Some(".agents") && comps.get(1).map(|s| s.as_str()) == Some("skills") {
-                return true;
+                return filter.claude || filter.cursor;
             }
             if comps.len() == 1 && PROJECT_FILE_NAMES.contains(&name.as_str()) {
-                return true;
+                if CLAUDE_PROJECT_FILES.contains(&name.as_str()) {
+                    return filter.claude;
+                }
+                // AGENTS.md is shared.
+                return filter.claude || filter.cursor;
             }
         }
     }
@@ -94,37 +111,54 @@ pub fn is_relevant(path: &Path, paths: &Paths, project_roots: &[PathBuf]) -> boo
 }
 
 /// Directories/files to subscribe to. Only paths that exist are returned.
-pub fn watch_targets(paths: &Paths, project_roots: &[PathBuf]) -> Vec<(PathBuf, RecursiveMode)> {
+pub fn watch_targets(
+    paths: &Paths,
+    project_roots: &[PathBuf],
+    filter: &ToolingFilter,
+) -> Vec<(PathBuf, RecursiveMode)> {
     let mut v: Vec<(PathBuf, RecursiveMode)> = Vec::new();
     let mut push = |p: PathBuf, m: RecursiveMode| {
         if p.exists() && !v.iter().any(|(q, _)| q == &p) {
             v.push((p, m));
         }
     };
-    // Config dir itself (non-recursive: settings.json, CLAUDE.md) + specific subtrees.
-    // `projects/` is deliberately skipped — transcripts churn constantly.
-    push(paths.config_dir.clone(), RecursiveMode::NonRecursive);
-    for sub in ["rules", "skills", "commands", "agents", "output-styles", "workflows", "plugins"] {
-        push(paths.config_dir.join(sub), RecursiveMode::Recursive);
+    if filter.claude {
+        // Config dir itself (non-recursive: settings.json, CLAUDE.md) + specific subtrees.
+        // `projects/` is deliberately skipped — transcripts churn constantly.
+        push(paths.config_dir.clone(), RecursiveMode::NonRecursive);
+        for sub in ["rules", "skills", "commands", "agents", "output-styles", "workflows", "plugins"] {
+            push(paths.config_dir.join(sub), RecursiveMode::Recursive);
+        }
+        if let Some(parent) = paths.claude_json.parent() {
+            push(parent.to_path_buf(), RecursiveMode::NonRecursive);
+        }
+        push(paths.managed_dir.clone(), RecursiveMode::NonRecursive);
     }
-    if let Some(parent) = paths.claude_json.parent() {
-        push(parent.to_path_buf(), RecursiveMode::NonRecursive);
+    if filter.cursor {
+        // Cursor user config
+        push(paths.cursor_dir.clone(), RecursiveMode::NonRecursive);
+        for sub in ["rules", "skills", "commands", "agents", "hooks"] {
+            push(paths.cursor_dir.join(sub), RecursiveMode::Recursive);
+        }
+        if let Some(parent) = paths.cursor_managed_hooks.parent() {
+            push(parent.to_path_buf(), RecursiveMode::NonRecursive);
+        }
     }
-    push(paths.managed_dir.clone(), RecursiveMode::NonRecursive);
-    // Cursor user config
-    push(paths.cursor_dir.clone(), RecursiveMode::NonRecursive);
-    for sub in ["rules", "skills", "commands", "agents", "hooks"] {
-        push(paths.cursor_dir.join(sub), RecursiveMode::Recursive);
-    }
-    push(paths.home.join(".agents/skills"), RecursiveMode::Recursive);
-    if let Some(parent) = paths.cursor_managed_hooks.parent() {
-        push(parent.to_path_buf(), RecursiveMode::NonRecursive);
+    // Shared agents skills — keep if either product is enabled.
+    if filter.claude || filter.cursor {
+        push(paths.home.join(".agents/skills"), RecursiveMode::Recursive);
     }
     for root in project_roots {
         push(root.clone(), RecursiveMode::NonRecursive);
-        push(root.join(".claude"), RecursiveMode::Recursive);
-        push(root.join(".cursor"), RecursiveMode::Recursive);
-        push(root.join(".agents/skills"), RecursiveMode::Recursive);
+        if filter.claude {
+            push(root.join(".claude"), RecursiveMode::Recursive);
+        }
+        if filter.cursor {
+            push(root.join(".cursor"), RecursiveMode::Recursive);
+        }
+        if filter.claude || filter.cursor {
+            push(root.join(".agents/skills"), RecursiveMode::Recursive);
+        }
     }
     v
 }
@@ -208,7 +242,12 @@ fn canonical_paths(p: &Paths) -> Paths {
     }
 }
 
-pub fn start(paths: Paths, project_roots: Vec<PathBuf>, sink: Sink) -> AppResult<WatcherHandle> {
+pub fn start(
+    paths: Paths,
+    project_roots: Vec<PathBuf>,
+    filter: ToolingFilter,
+    sink: Sink,
+) -> AppResult<WatcherHandle> {
     let paths = canonical_paths(&paths);
     let project_roots: Vec<PathBuf> =
         project_roots.iter().map(|r| dunce::canonicalize(r).unwrap_or_else(|_| r.clone())).collect();
@@ -216,7 +255,7 @@ pub fn start(paths: Paths, project_roots: Vec<PathBuf>, sink: Sink) -> AppResult
     let mut watcher = notify::recommended_watcher(move |res| {
         let _ = tx.send(res);
     })?;
-    let targets = watch_targets(&paths, &project_roots);
+    let targets = watch_targets(&paths, &project_roots, &filter);
     let mut watched = Vec::new();
     for (p, mode) in &targets {
         // Individual failures (permissions, vanished dirs) shouldn't stop the whole watcher.
@@ -235,7 +274,7 @@ pub fn start(paths: Paths, project_roots: Vec<PathBuf>, sink: Sink) -> AppResult
                         if let Some(kind) = kind_str(&ev.kind) {
                             let now = Instant::now();
                             for p in ev.paths {
-                                if is_relevant(&p, &paths, &project_roots) {
+                                if is_relevant(&p, &paths, &project_roots, &filter) {
                                     deb.push(p, kind, now);
                                 }
                             }
@@ -289,31 +328,45 @@ mod tests {
         assert_eq!(out[1].kind, "modified");
     }
 
+    fn all() -> ToolingFilter {
+        ToolingFilter::all()
+    }
+
     #[test]
     fn relevance_filter() {
         let d = tempdir().unwrap();
         let paths = Paths::for_root(d.path());
         let proj = d.path().join("proj");
         let roots = vec![proj.clone()];
-        assert!(is_relevant(&paths.config_dir.join("settings.json"), &paths, &roots));
-        assert!(is_relevant(&paths.config_dir.join("skills/x/SKILL.md"), &paths, &roots));
-        assert!(is_relevant(&paths.config_dir.join("projects/a/memory/MEMORY.md"), &paths, &roots));
-        assert!(!is_relevant(&paths.config_dir.join("projects/a/t.jsonl"), &paths, &roots));
-        assert!(!is_relevant(&paths.config_dir.join(".credentials.json"), &paths, &roots));
-        assert!(!is_relevant(&paths.config_dir.join("history.jsonl"), &paths, &roots));
-        assert!(is_relevant(&paths.claude_json, &paths, &roots));
-        assert!(is_relevant(&proj.join("CLAUDE.md"), &paths, &roots));
-        assert!(is_relevant(&proj.join(".claude/settings.json"), &paths, &roots));
-        assert!(!is_relevant(&proj.join("src/main.rs"), &paths, &roots));
-        assert!(!is_relevant(&proj.join(".claude/node_modules/x"), &paths, &roots));
-        assert!(!is_relevant(&d.path().join("random.txt"), &paths, &roots));
+        let f = all();
+        assert!(is_relevant(&paths.config_dir.join("settings.json"), &paths, &roots, &f));
+        assert!(is_relevant(&paths.config_dir.join("skills/x/SKILL.md"), &paths, &roots, &f));
+        assert!(is_relevant(&paths.config_dir.join("projects/a/memory/MEMORY.md"), &paths, &roots, &f));
+        assert!(!is_relevant(&paths.config_dir.join("projects/a/t.jsonl"), &paths, &roots, &f));
+        assert!(!is_relevant(&paths.config_dir.join(".credentials.json"), &paths, &roots, &f));
+        assert!(!is_relevant(&paths.config_dir.join("history.jsonl"), &paths, &roots, &f));
+        assert!(is_relevant(&paths.claude_json, &paths, &roots, &f));
+        assert!(is_relevant(&proj.join("CLAUDE.md"), &paths, &roots, &f));
+        assert!(is_relevant(&proj.join(".claude/settings.json"), &paths, &roots, &f));
+        assert!(!is_relevant(&proj.join("src/main.rs"), &paths, &roots, &f));
+        assert!(!is_relevant(&proj.join(".claude/node_modules/x"), &paths, &roots, &f));
+        assert!(!is_relevant(&d.path().join("random.txt"), &paths, &roots, &f));
         // Cursor
-        assert!(is_relevant(&paths.cursor_dir.join("rules/a.mdc"), &paths, &roots));
-        assert!(is_relevant(&paths.cursor_mcp_json, &paths, &roots));
-        assert!(is_relevant(&paths.cursor_hooks_json, &paths, &roots));
-        assert!(is_relevant(&proj.join(".cursor/skills/x/SKILL.md"), &paths, &roots));
-        assert!(is_relevant(&proj.join(".agents/skills/y/SKILL.md"), &paths, &roots));
-        assert!(!is_relevant(&paths.cursor_dir.join("secrets.txt"), &paths, &roots));
+        assert!(is_relevant(&paths.cursor_dir.join("rules/a.mdc"), &paths, &roots, &f));
+        assert!(is_relevant(&paths.cursor_mcp_json, &paths, &roots, &f));
+        assert!(is_relevant(&paths.cursor_hooks_json, &paths, &roots, &f));
+        assert!(is_relevant(&proj.join(".cursor/skills/x/SKILL.md"), &paths, &roots, &f));
+        assert!(is_relevant(&proj.join(".agents/skills/y/SKILL.md"), &paths, &roots, &f));
+        assert!(!is_relevant(&paths.cursor_dir.join("secrets.txt"), &paths, &roots, &f));
+
+        let cursor_off = ToolingFilter {
+            claude: true,
+            cursor: false,
+        };
+        assert!(!is_relevant(&paths.cursor_dir.join("rules/a.mdc"), &paths, &roots, &cursor_off));
+        assert!(!is_relevant(&proj.join(".cursor/skills/x/SKILL.md"), &paths, &roots, &cursor_off));
+        assert!(is_relevant(&proj.join(".agents/skills/y/SKILL.md"), &paths, &roots, &cursor_off));
+        assert!(is_relevant(&paths.config_dir.join("settings.json"), &paths, &roots, &cursor_off));
     }
 
     #[test]
@@ -325,12 +378,21 @@ mod tests {
         let proj = d.path().join("p");
         std::fs::create_dir_all(proj.join(".claude")).unwrap();
         std::fs::create_dir_all(proj.join(".cursor")).unwrap();
-        let t = watch_targets(&paths, &[proj.clone()]);
+        let t = watch_targets(&paths, &[proj.clone()], &all());
         assert!(t.iter().any(|(p, m)| p == &paths.config_dir.join("rules") && *m == RecursiveMode::Recursive));
         assert!(t.iter().any(|(p, _)| p == &proj.join(".claude")));
         assert!(!t.iter().any(|(p, _)| p == &paths.config_dir.join("skills")));
         assert!(t.iter().any(|(p, m)| p == &paths.cursor_dir.join("skills") && *m == RecursiveMode::Recursive));
         assert!(t.iter().any(|(p, _)| p == &proj.join(".cursor")));
+
+        let claude_only = ToolingFilter {
+            claude: true,
+            cursor: false,
+        };
+        let t = watch_targets(&paths, &[proj.clone()], &claude_only);
+        assert!(t.iter().any(|(p, _)| p == &proj.join(".claude")));
+        assert!(!t.iter().any(|(p, _)| p == &proj.join(".cursor")));
+        assert!(!t.iter().any(|(p, _)| p == &paths.cursor_dir.join("skills")));
     }
 
     #[test]
@@ -339,7 +401,7 @@ mod tests {
         let d = tempdir().unwrap();
         let paths = Paths::for_root(d.path());
         std::fs::create_dir_all(&paths.config_dir).unwrap();
-        let h = start(paths, vec![], Arc::new(|_| {})).unwrap();
+        let h = start(paths, vec![], ToolingFilter::all(), Arc::new(|_| {})).unwrap();
         assert!(!h.targets.is_empty());
         drop(h);
     }

@@ -10,6 +10,7 @@ pub mod resolver;
 pub mod scanner;
 pub mod state;
 pub mod storage;
+pub mod tooling;
 pub mod updates;
 pub mod watcher;
 
@@ -63,6 +64,7 @@ pub fn run() {
             commands::search_artifacts,
             commands::get_preferences,
             commands::set_preferences,
+            commands::get_tooling_presence,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
+import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import { useUiStore } from "@/stores/ui";
 import { formatTime, relativeTime, shortenPath } from "@/lib/format";
 import { PRODUCT_LABEL, resolveProduct } from "@/lib/labels";
 import { RU, pluralCount } from "@/lib/plural";
+import { isProductTracked } from "@/lib/tooling";
 import Badge from "@/components/common/Badge.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import ScopeBadge from "@/components/common/ScopeBadge.vue";
 
 const scan = useScanStore();
+const prefs = usePreferencesStore();
 const ui = useUiStore();
 const router = useRouter();
 
@@ -20,13 +23,18 @@ const productStats = computed(() => {
   let claude = 0;
   let cursor = 0;
   for (const a of scan.artifacts) {
-    if (resolveProduct(a.product) === "cursor") cursor += 1;
+    const product = resolveProduct(a.product);
+    if (!isProductTracked(prefs.prefs, product)) continue;
+    if (product === "cursor") cursor += 1;
     else claude += 1;
   }
   const withClaude = scan.projects.filter((p) => p.hasClaudeDir).length;
   const withCursor = scan.projects.filter((p) => p.hasCursorDir).length;
   return { claude, cursor, withClaude, withCursor };
 });
+
+const showClaude = computed(() => prefs.prefs.trackClaude);
+const showCursor = computed(() => prefs.prefs.trackCursor);
 
 const cards = computed(() => {
   const d = scan.dashboard;
@@ -65,18 +73,25 @@ const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
 <template>
   <div class="h-full overflow-y-auto">
     <div class="mx-auto max-w-5xl space-y-6 px-6 py-5">
-      <section class="flex flex-wrap items-center gap-2 text-xs text-muted">
-        <Badge tone="info">{{ PRODUCT_LABEL.claude }}</Badge>
-        <span>
-          {{ pluralCount(productStats.claude, RU.artifact) }} ·
-          {{ pluralCount(productStats.withClaude, RU.project) }}
-        </span>
-        <span class="text-subtle">·</span>
-        <Badge tone="accent">{{ PRODUCT_LABEL.cursor }}</Badge>
-        <span>
-          {{ pluralCount(productStats.cursor, RU.artifact) }} ·
-          {{ pluralCount(productStats.withCursor, RU.project) }}
-        </span>
+      <section
+        v-if="showClaude || showCursor"
+        class="flex flex-wrap items-center gap-2 text-xs text-muted"
+      >
+        <template v-if="showClaude">
+          <Badge tone="info">{{ PRODUCT_LABEL.claude }}</Badge>
+          <span>
+            {{ pluralCount(productStats.claude, RU.artifact) }} ·
+            {{ pluralCount(productStats.withClaude, RU.project) }}
+          </span>
+        </template>
+        <span v-if="showClaude && showCursor" class="text-subtle">·</span>
+        <template v-if="showCursor">
+          <Badge tone="accent">{{ PRODUCT_LABEL.cursor }}</Badge>
+          <span>
+            {{ pluralCount(productStats.cursor, RU.artifact) }} ·
+            {{ pluralCount(productStats.withCursor, RU.project) }}
+          </span>
+        </template>
       </section>
 
       <section>
@@ -140,7 +155,7 @@ const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
             compact
             icon="activity"
             title="Нет недавних изменений"
-            description="Изменения файлов в отслеживаемых каталогах Claude Code и Cursor появятся здесь."
+            description="Изменения файлов в каталогах включённых AI-инструментов появятся здесь."
           />
         </div>
         <ul v-else class="card divide-y divide-line">

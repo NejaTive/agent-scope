@@ -4,7 +4,8 @@ import { ipc } from "@/lib/ipc";
 import { errMsg, normalizeContent } from "@/lib/normalize";
 import { extname, formatTime, shortenPath } from "@/lib/format";
 import { languageForExt } from "@/lib/highlight";
-import { KIND_LABEL, STATUS_LABEL, STATUS_TONE } from "@/lib/labels";
+import { KIND_LABEL, STATUS_LABEL, STATUS_TONE, resolveProduct } from "@/lib/labels";
+import { isProductTracked } from "@/lib/tooling";
 import type { BrowserItem } from "@/lib/browser";
 import type { ViewContent } from "@/types/config";
 import { useScanStore } from "@/stores/scan";
@@ -331,7 +332,10 @@ const status = computed(() => props.item.status ?? "present");
       <div class="flex flex-wrap items-center gap-2">
         <h2 class="min-w-0 break-words text-sm font-semibold">{{ item.name }}</h2>
         <Badge v-if="kindLabel">{{ kindLabel }}</Badge>
-        <ProductBadge :product="item.product" />
+        <ProductBadge
+          v-if="isProductTracked(prefs.prefs, resolveProduct(item.product))"
+          :product="item.product"
+        />
         <ScopeBadge :scope="item.scope" />
         <Badge
           v-if="status !== 'present'"

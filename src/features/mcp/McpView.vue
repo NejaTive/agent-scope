@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import type { BrowserItem } from "@/lib/browser";
 import { maskRecord } from "@/lib/secrets";
@@ -9,6 +10,7 @@ import FieldList, { type Field } from "@/components/common/FieldList.vue";
 import Badge from "@/components/common/Badge.vue";
 
 const scan = useScanStore();
+const prefs = usePreferencesStore();
 const byId = computed(() => new Map(scan.mcpServers.map((s) => [s.id, s])));
 
 const items = computed<BrowserItem[]>(() =>
@@ -47,6 +49,16 @@ function recordFields(prefix: string, s: McpServerEntry, key: string): Field[] {
   const rec = asRecord(asRecord(s.config)?.[key]);
   return Object.entries(maskRecord(rec)).map(([k, v]) => ({ label: `${prefix}.${k}`, value: v }));
 }
+
+const emptyDescription = computed(() => {
+  const parts = [".mcp.json"];
+  if (prefs.prefs.trackClaude) parts.push("~/.claude.json");
+  if (prefs.prefs.trackCursor) parts.push("~/.cursor/mcp.json");
+  parts.push("файлах настроек");
+  const head = parts.slice(0, -1).join(", ");
+  const last = parts[parts.length - 1];
+  return `Серверы объявляются в ${head} и ${last}.`;
+});
 </script>
 
 <template>
@@ -56,7 +68,7 @@ function recordFields(prefix: string, s: McpServerEntry, key: string): Field[] {
     collapsed-content
     content-label="Исходный файл"
     empty-title="MCP-серверы не настроены"
-    empty-description="Серверы объявляются в .mcp.json, ~/.claude.json, ~/.cursor/mcp.json и файлах настроек."
+    :empty-description="emptyDescription"
   >
     <template #detail="{ item }">
       <template v-if="byId.get(item.id)">

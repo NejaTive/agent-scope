@@ -95,6 +95,13 @@ impl Storage {
         if let Some(v) = self.get_pref("allowEditing")? {
             p.allow_editing = v == "true";
         }
+        // Missing keys → true (Default), so older DBs keep both products on.
+        if let Some(v) = self.get_pref("trackClaude")? {
+            p.track_claude = v == "true";
+        }
+        if let Some(v) = self.get_pref("trackCursor")? {
+            p.track_cursor = v == "true";
+        }
         Ok(p)
     }
 
@@ -103,6 +110,8 @@ impl Storage {
         self.set_pref("watchOnStart", &p.watch_on_start.to_string())?;
         self.set_pref("notifications", &p.notifications.to_string())?;
         self.set_pref("allowEditing", &p.allow_editing.to_string())?;
+        self.set_pref("trackClaude", &p.track_claude.to_string())?;
+        self.set_pref("trackCursor", &p.track_cursor.to_string())?;
         Ok(())
     }
 
@@ -215,14 +224,26 @@ mod tests {
             watch_on_start: true,
             notifications: true,
             allow_editing: true,
+            track_claude: true,
+            track_cursor: false,
         };
         s.set_preferences(&p).unwrap();
         let got = s.get_preferences().unwrap();
         assert_eq!(got.theme, "dark");
         assert!(got.watch_on_start && got.notifications && got.allow_editing);
+        assert!(got.track_claude && !got.track_cursor);
         assert!(!Preferences::default().allow_editing);
+        assert!(Preferences::default().track_claude && Preferences::default().track_cursor);
         s.set_pref("theme", "light").unwrap();
         assert_eq!(s.get_pref("theme").unwrap().as_deref(), Some("light"));
+    }
+
+    #[test]
+    fn missing_track_prefs_default_true() {
+        let s = Storage::open_in_memory().unwrap();
+        s.set_pref("theme", "dark").unwrap();
+        let got = s.get_preferences().unwrap();
+        assert!(got.track_claude && got.track_cursor);
     }
 
     #[test]

@@ -16,6 +16,7 @@ import type {
   SaveArtifactResult,
   SearchFilters,
   SettingsDiff,
+  ToolingPresence,
   UpdateCheckResult,
 } from "@/types/config";
 
@@ -121,6 +122,8 @@ export const ipc = {
   getPreferences: () => call<Preferences>("get_preferences"),
   setPreferences: (prefs: Preferences) =>
     call<Preferences>("set_preferences", { prefs }),
+  /** Detected on-disk presence of Claude / Cursor config roots. */
+  getToolingPresence: () => call<ToolingPresence>("get_tooling_presence"),
 
   checkForUpdates: () => call<UpdateCheckResult>("check_for_updates"),
 };

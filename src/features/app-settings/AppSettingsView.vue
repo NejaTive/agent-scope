@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import { useUpdatesStore } from "@/stores/updates";
+import { ipc } from "@/lib/ipc";
 import { shortenPath } from "@/lib/format";
-import type { ThemePreference } from "@/types/config";
+import { TOOLING_PROVIDERS } from "@/lib/tooling";
+import type { Preferences, ThemePreference, ToolingPresence } from "@/types/config";
 import Badge from "@/components/common/Badge.vue";
 import Icon from "@/components/common/Icon.vue";
 
@@ -17,6 +19,40 @@ const THEMES: Array<{ value: ThemePreference; label: string }> = [
   { value: "light", label: "Светлая" },
   { value: "system", label: "Системная" },
 ];
+
+const presence = ref<ToolingPresence>({ claude: false, cursor: false });
+
+async function loadPresence() {
+  try {
+    presence.value = await ipc.getToolingPresence();
+  } catch {
+    /* backend may not expose the command yet */
+  }
+}
+
+onMounted(() => {
+  void loadPresence();
+});
+
+watch(
+  () => prefs.loaded,
+  (loaded) => {
+    if (loaded) void loadPresence();
+  },
+);
+
+function isLastEnabled(prefKey: (typeof TOOLING_PROVIDERS)[number]["prefKey"]): boolean {
+  const p = prefs.prefs;
+  const enabled = TOOLING_PROVIDERS.filter((t) => p[t.prefKey]);
+  return enabled.length === 1 && enabled[0]!.prefKey === prefKey;
+}
+
+function onTrackToggle(
+  prefKey: (typeof TOOLING_PROVIDERS)[number]["prefKey"],
+  checked: boolean,
+) {
+  void prefs.update({ [prefKey]: checked } as Partial<Preferences>);
+}
 
 const statusText = computed(() => {
   switch (updates.status) {
@@ -69,8 +105,11 @@ async function openRelease() {
         v-if="prefs.error"
         class="rounded-md border border-warn/30 bg-warn/10 px-3 py-1.5 text-xs text-warn"
       >
-        Не удалось синхронизировать настройки с бэкендом ({{ prefs.error }}).
-        Изменения сохранены локально.
+        {{
+          prefs.error.includes("AI-инструмент")
+            ? prefs.error
+            : `Не удалось синхронизировать настройки с бэкендом (${prefs.error}). Изменения сохранены локально.`
+        }}
       </div>
 
       <section>
@@ -100,6 +139,53 @@ async function openRelease() {
       </section>
 
       <section>
+        <h2 class="label mb-2">AI-инструменты</h2>
+        <div class="card divide-y divide-line">
+          <label
+            v-for="provider in TOOLING_PROVIDERS"
+            :key="provider.id"
+            class="flex items-center justify-between gap-4 px-3 py-2.5"
+            :class="
+              isLastEnabled(provider.prefKey)
+                ? 'cursor-not-allowed opacity-80'
+                : 'cursor-pointer'
+            "
+          >
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-[13px] font-medium">{{ provider.label }}</span>
+                <Badge
+                  :tone="presence[provider.id] ? 'ok' : 'neutral'"
+                  class="!text-2xs"
+                >
+                  {{ presence[provider.id] ? "обнаружен" : "не найден" }}
+                </Badge>
+              </div>
+              <div class="text-xs text-muted">
+                Включать {{ provider.label }} в сканирование и отслеживание
+                изменений.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              class="h-3.5 w-3.5 shrink-0 accent-[rgb(var(--accent))]"
+              :checked="prefs.prefs[provider.prefKey]"
+              :disabled="isLastEnabled(provider.prefKey)"
+              @change="
+                onTrackToggle(
+                  provider.prefKey,
+                  ($event.target as HTMLInputElement).checked,
+                )
+              "
+            />
+          </label>
+        </div>
+        <p class="mt-1.5 text-2xs text-subtle">
+          Хотя бы один инструмент должен оставаться включённым.
+        </p>
+      </section>
+
+      <section>
         <h2 class="label mb-2">Сканирование</h2>
         <div class="card divide-y divide-line">
           <label
@@ -111,8 +197,8 @@ async function openRelease() {
               </div>
               <div class="text-xs text-muted">
                 Автоматическое мягкое обновление при изменении конфигурации
-                Claude Code и Cursor на диске. Переключение сразу запускает или
-                останавливает наблюдатель.
+                включённых AI-инструментов на диске. Переключение сразу
+                запускает или останавливает наблюдатель.
               </div>
             </div>
             <input
@@ -132,8 +218,8 @@ async function openRelease() {
             <div>
               <div class="text-[13px] font-medium">Уведомления</div>
               <div class="text-xs text-muted">
-                Уведомлять об изменении конфигурации Claude Code и Cursor на
-                диске.
+                Уведомлять об изменении конфигурации включённых AI-инструментов
+                на диске.
               </div>
             </div>
             <input
@@ -208,13 +294,15 @@ async function openRelease() {
           <dd>{{ scan.appInfo?.name ?? "Agent Scope" }}</dd>
           <dt class="text-subtle">Версия</dt>
           <dd class="font-mono">{{ scan.appInfo?.version ?? "0.3.2" }}</dd>
-          <template v-if="scan.globalMeta.configDir">
+          <template v-if="prefs.prefs.trackClaude && scan.globalMeta.configDir">
             <dt class="text-subtle">Каталог Claude Code</dt>
             <dd class="break-all font-mono">
               {{ shortenPath(scan.globalMeta.configDir) }}
             </dd>
           </template>
-          <template v-if="scan.globalMeta.cursorConfigDir">
+          <template
+            v-if="prefs.prefs.trackCursor && scan.globalMeta.cursorConfigDir"
+          >
             <dt class="text-subtle">Каталог Cursor</dt>
             <dd class="break-all font-mono">
               {{ shortenPath(scan.globalMeta.cursorConfigDir) }}

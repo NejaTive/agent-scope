@@ -2,10 +2,13 @@
 import { computed, ref } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { storeToRefs } from "pinia";
+import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import { useUiStore } from "@/stores/ui";
 import { artifactToItem, type BrowserItem } from "@/lib/browser";
 import { shortenPath } from "@/lib/format";
+import { resolveProduct } from "@/lib/labels";
+import { isProductTracked, trackedDirLabels } from "@/lib/tooling";
 import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
 import ProductBadge from "@/components/common/ProductBadge.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
@@ -14,6 +17,7 @@ import SettingsDiffPanel from "@/features/settings/SettingsDiffPanel.vue";
 
 const route = useRoute();
 const scan = useScanStore();
+const prefs = usePreferencesStore();
 const { search } = storeToRefs(useUiStore());
 
 const tab = ref<"inventory" | "diff">("inventory");
@@ -30,6 +34,7 @@ const items = computed<BrowserItem[]>(() => {
   const artifactPaths = new Set<string>();
   for (const a of scan.artifacts) {
     if (a.projectPath !== path) continue;
+    if (!isProductTracked(prefs.prefs, resolveProduct(a.product))) continue;
     out.set(a.id, artifactToItem(a));
     artifactPaths.add(`${a.kind}:${a.path}`);
   }
@@ -37,6 +42,7 @@ const items = computed<BrowserItem[]>(() => {
   // an artifact of that kind for the same declaring file.
   for (const h of scan.hooks) {
     if (h.projectPath !== path || out.has(h.id) || artifactPaths.has(`hook:${h.sourcePath}`)) continue;
+    if (!isProductTracked(prefs.prefs, resolveProduct(h.product))) continue;
     out.set(h.id, {
       id: h.id,
       name: h.matcher ? `${h.event} · ${h.matcher}` : h.event,
@@ -53,6 +59,7 @@ const items = computed<BrowserItem[]>(() => {
   }
   for (const s of scan.mcpServers) {
     if (s.projectPath !== path || out.has(s.id) || artifactPaths.has(`mcpServer:${s.sourcePath}`)) continue;
+    if (!isProductTracked(prefs.prefs, resolveProduct(s.product))) continue;
     out.set(s.id, {
       id: s.id,
       name: s.name,
@@ -68,6 +75,11 @@ const items = computed<BrowserItem[]>(() => {
     });
   }
   return [...out.values()];
+});
+
+const emptyInventoryDescription = computed(() => {
+  const dirs = trackedDirLabels(prefs.prefs);
+  return `В этом проекте не найдены каталоги ${dirs}, CLAUDE.md, AGENTS.md или .mcp.json.`;
 });
 </script>
 
@@ -91,11 +103,17 @@ const items = computed<BrowserItem[]>(() => {
         <div class="flex items-center gap-2">
           <span class="truncate text-[13px] font-semibold">{{ project.name }}</span>
           <ProductBadge
-            v-if="project.hasClaudeDir || project.hasClaudeMd || project.hasMcpJson"
+            v-if="
+              prefs.prefs.trackClaude &&
+              (project.hasClaudeDir || project.hasClaudeMd || project.hasMcpJson)
+            "
             product="claude"
           />
           <ProductBadge
-            v-if="project.hasCursorDir || project.hasCursorMcpJson"
+            v-if="
+              prefs.prefs.trackCursor &&
+              (project.hasCursorDir || project.hasCursorMcpJson)
+            "
             product="cursor"
           />
         </div>
@@ -120,7 +138,7 @@ const items = computed<BrowserItem[]>(() => {
         :loading="!scan.initialized"
         kind-filter
         empty-title="Нет проектной конфигурации"
-        empty-description="В этом проекте не найдены каталоги .claude / .cursor, CLAUDE.md, AGENTS.md или .mcp.json."
+        :empty-description="emptyInventoryDescription"
       />
       <div v-else class="h-full overflow-y-auto">
         <div class="mx-auto max-w-5xl px-6 py-5">

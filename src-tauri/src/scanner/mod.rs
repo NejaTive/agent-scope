@@ -11,6 +11,7 @@ pub use discovery::{discover_projects, discover_projects_excluding, info_for_dir
 use crate::models::*;
 use crate::parser::{self, mask_secrets, JsonFile};
 use crate::paths::{is_skipped_dir, Paths};
+use crate::tooling::ToolingFilter;
 use collect::*;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap};
@@ -70,83 +71,88 @@ pub fn claude_json_view(v: &Value) -> Value {
 // ---------------------------------------------------------------- global
 
 pub fn scan_global() -> GlobalBundle {
-    scan_global_with(&ScanContext::load(&Paths::resolve()))
+    scan_global_with(&ScanContext::load(&Paths::resolve()), &ToolingFilter::all())
 }
 
-pub fn scan_global_with(ctx: &ScanContext) -> GlobalBundle {
+pub fn scan_global_with(ctx: &ScanContext, filter: &ToolingFilter) -> GlobalBundle {
     let paths = &ctx.paths;
     let mut c = Collection::default();
+    let mut credentials_present = false;
 
-    // Managed (enterprise) — optional, may be unreadable.
-    collect_settings_file(&mut c, &paths.managed_dir.join("managed-settings.json"), Scope::Managed, None, false);
-    let drop_in = paths.managed_dir.join("managed-settings.d");
-    if let Ok(rd) = std::fs::read_dir(&drop_in) {
-        let mut files: Vec<PathBuf> = rd
-            .filter_map(|e| e.ok())
-            .map(|e| e.path())
-            .filter(|p| p.extension().map(|e| e == "json").unwrap_or(false))
-            .collect();
-        files.sort();
-        for f in files {
-            collect_settings_file(&mut c, &f, Scope::Managed, None, false);
-        }
-    }
-    collect_claude_md(&mut c, &paths.managed_dir.join("CLAUDE.md"), Scope::Managed, None, false);
-    collect_mcp_json(&mut c, &paths.managed_dir.join("managed-mcp.json"), Scope::Managed, None, "managed-mcp.json");
-
-    // User scope (Claude)
-    collect_settings_file(&mut c, &paths.config_dir.join("settings.json"), Scope::User, None, false);
-    collect_claude_md(&mut c, &paths.config_dir.join("CLAUDE.md"), Scope::User, None, false);
-    collect_claude_dir(&mut c, &paths.config_dir, Scope::User, None);
-    plugins::collect_plugins(&mut c, paths);
-    plugins::collect_memory(&mut c, paths);
-    let credentials_present = if let Some(a) = plugins::credentials_artifact(paths) {
-        c.artifacts.push(a);
-        true
-    } else {
-        false
-    };
-
-    // User scope (Cursor) — after Claude so `.claude/**` paths stay Claude-owned.
-    cursor::collect_cursor_user(&mut c, paths);
-
-    // ~/.claude.json: top-level (user-scope) MCP servers only. The `projects` map is
-    // attributed to each project's own bundle.
-    let cj = &ctx.claude_json;
-    if cj.status != DiscoveryStatus::Missing {
-        let mut a = ConfigArtifact::new(
-            ArtifactKind::Other,
-            Scope::GlobalConfig,
-            ".claude.json",
-            path_str(&paths.claude_json),
-            None,
-        );
-        a.status = cj.status;
-        a.error = cj.error.clone();
-        if let Ok(m) = std::fs::metadata(&paths.claude_json) {
-            a.size_bytes = Some(m.len());
-            a.modified_at = m
-                .modified()
-                .ok()
-                .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339());
-        }
-        if let Some(v) = &cj.value {
-            let n_proj = v.get("projects").and_then(|p| p.as_object()).map(|o| o.len()).unwrap_or(0);
-            a.description = Some(format!("{n_proj} project entr{}", if n_proj == 1 { "y" } else { "ies" }));
-            a.metadata = json!({ "projectEntries": n_proj });
-            if let Some(s) = v.get("mcpServers") {
-                collect_mcp_servers(&mut c, s, Scope::User, &paths.claude_json, None, "~/.claude.json");
+    if filter.claude {
+        // Managed (enterprise) — optional, may be unreadable.
+        collect_settings_file(&mut c, &paths.managed_dir.join("managed-settings.json"), Scope::Managed, None, false);
+        let drop_in = paths.managed_dir.join("managed-settings.d");
+        if let Ok(rd) = std::fs::read_dir(&drop_in) {
+            let mut files: Vec<PathBuf> = rd
+                .filter_map(|e| e.ok())
+                .map(|e| e.path())
+                .filter(|p| p.extension().map(|e| e == "json").unwrap_or(false))
+                .collect();
+            files.sort();
+            for f in files {
+                collect_settings_file(&mut c, &f, Scope::Managed, None, false);
             }
         }
-        if matches!(cj.status, DiscoveryStatus::InvalidJson | DiscoveryStatus::Unreadable) {
-            c.errors.push(ScanError {
-                path: path_str(&paths.claude_json),
-                scope: Some(Scope::GlobalConfig),
-                status: cj.status,
-                message: cj.error.clone().unwrap_or_default(),
-            });
+        collect_claude_md(&mut c, &paths.managed_dir.join("CLAUDE.md"), Scope::Managed, None, false);
+        collect_mcp_json(&mut c, &paths.managed_dir.join("managed-mcp.json"), Scope::Managed, None, "managed-mcp.json");
+
+        // User scope (Claude)
+        collect_settings_file(&mut c, &paths.config_dir.join("settings.json"), Scope::User, None, false);
+        collect_claude_md(&mut c, &paths.config_dir.join("CLAUDE.md"), Scope::User, None, false);
+        collect_claude_dir(&mut c, &paths.config_dir, Scope::User, None);
+        plugins::collect_plugins(&mut c, paths);
+        plugins::collect_memory(&mut c, paths);
+        credentials_present = if let Some(a) = plugins::credentials_artifact(paths) {
+            c.artifacts.push(a);
+            true
+        } else {
+            false
+        };
+
+        // ~/.claude.json: top-level (user-scope) MCP servers only. The `projects` map is
+        // attributed to each project's own bundle.
+        let cj = &ctx.claude_json;
+        if cj.status != DiscoveryStatus::Missing {
+            let mut a = ConfigArtifact::new(
+                ArtifactKind::Other,
+                Scope::GlobalConfig,
+                ".claude.json",
+                path_str(&paths.claude_json),
+                None,
+            );
+            a.status = cj.status;
+            a.error = cj.error.clone();
+            if let Ok(m) = std::fs::metadata(&paths.claude_json) {
+                a.size_bytes = Some(m.len());
+                a.modified_at = m
+                    .modified()
+                    .ok()
+                    .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339());
+            }
+            if let Some(v) = &cj.value {
+                let n_proj = v.get("projects").and_then(|p| p.as_object()).map(|o| o.len()).unwrap_or(0);
+                a.description = Some(format!("{n_proj} project entr{}", if n_proj == 1 { "y" } else { "ies" }));
+                a.metadata = json!({ "projectEntries": n_proj });
+                if let Some(s) = v.get("mcpServers") {
+                    collect_mcp_servers(&mut c, s, Scope::User, &paths.claude_json, None, "~/.claude.json");
+                }
+            }
+            if matches!(cj.status, DiscoveryStatus::InvalidJson | DiscoveryStatus::Unreadable) {
+                c.errors.push(ScanError {
+                    path: path_str(&paths.claude_json),
+                    scope: Some(Scope::GlobalConfig),
+                    status: cj.status,
+                    message: cj.error.clone().unwrap_or_default(),
+                });
+            }
+            c.artifacts.push(a);
         }
-        c.artifacts.push(a);
+    }
+
+    // User scope (Cursor) — after Claude so `.claude/**` paths stay Claude-owned.
+    if filter.cursor {
+        cursor::collect_cursor_user(&mut c, paths);
     }
 
     GlobalBundle {
@@ -162,41 +168,49 @@ pub fn scan_global_with(ctx: &ScanContext) -> GlobalBundle {
 // ---------------------------------------------------------------- project
 
 pub fn scan_project(root: &Path) -> ProjectBundle {
-    scan_project_with(&ScanContext::load(&Paths::resolve()), root)
+    scan_project_with(
+        &ScanContext::load(&Paths::resolve()),
+        root,
+        &ToolingFilter::all(),
+    )
 }
 
-pub fn scan_project_with(ctx: &ScanContext, root: &Path) -> ProjectBundle {
+pub fn scan_project_with(ctx: &ScanContext, root: &Path, filter: &ToolingFilter) -> ProjectBundle {
     let root = discovery::canonical(root);
     let project = path_str(&root);
     let p = Some(project.as_str());
     let mut c = Collection::default();
     let claude = root.join(".claude");
 
-    collect_settings_file(&mut c, &claude.join("settings.json"), Scope::Project, p, false);
-    collect_settings_file(&mut c, &claude.join("settings.local.json"), Scope::ProjectLocal, p, false);
+    if filter.claude {
+        collect_settings_file(&mut c, &claude.join("settings.json"), Scope::Project, p, false);
+        collect_settings_file(&mut c, &claude.join("settings.local.json"), Scope::ProjectLocal, p, false);
 
-    collect_claude_md(&mut c, &root.join("CLAUDE.md"), Scope::Project, p, false);
-    collect_claude_md(&mut c, &claude.join("CLAUDE.md"), Scope::Project, p, false);
-    collect_claude_md(&mut c, &root.join("CLAUDE.local.md"), Scope::ProjectLocal, p, false);
-    collect_claude_md(&mut c, &root.join("AGENTS.md"), Scope::Project, p, false);
+        collect_claude_md(&mut c, &root.join("CLAUDE.md"), Scope::Project, p, false);
+        collect_claude_md(&mut c, &claude.join("CLAUDE.md"), Scope::Project, p, false);
+        collect_claude_md(&mut c, &root.join("CLAUDE.local.md"), Scope::ProjectLocal, p, false);
+        collect_claude_md(&mut c, &root.join("AGENTS.md"), Scope::Project, p, false);
 
-    collect_mcp_json(&mut c, &root.join(".mcp.json"), Scope::Project, p, ".mcp.json");
-    if let Some(servers) = ctx.project_mcp.get(&project) {
-        collect_mcp_servers(
-            &mut c,
-            servers,
-            Scope::ProjectLocal,
-            &ctx.paths.claude_json,
-            p,
-            "~/.claude.json#projects",
-        );
+        collect_mcp_json(&mut c, &root.join(".mcp.json"), Scope::Project, p, ".mcp.json");
+        if let Some(servers) = ctx.project_mcp.get(&project) {
+            collect_mcp_servers(
+                &mut c,
+                servers,
+                Scope::ProjectLocal,
+                &ctx.paths.claude_json,
+                p,
+                "~/.claude.json#projects",
+            );
+        }
+
+        collect_claude_dir(&mut c, &claude, Scope::Project, p);
+        collect_nested_memory_files(&mut c, &root, p);
     }
 
-    collect_claude_dir(&mut c, &claude, Scope::Project, p);
-    collect_nested_memory_files(&mut c, &root, p);
-
     // Cursor project paths — skip anything Claude already collected (one path = one artifact).
-    cursor::collect_cursor_project(&mut c, &root, p);
+    if filter.cursor {
+        cursor::collect_cursor_project(&mut c, &root, p);
+    }
 
     let mut info = discovery::info_for_dir(&root);
     info.artifact_count = c.artifacts.iter().filter(|a| a.status != DiscoveryStatus::Missing).count();
@@ -232,22 +246,35 @@ fn collect_nested_memory_files(c: &mut Collection, root: &Path, project: Option<
 
 // ---------------------------------------------------------------- full scan
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ScanInput {
     pub scan_roots: Vec<PathBuf>,
     pub pinned: Vec<PathBuf>,
     pub max_depth: usize,
+    pub filter: ToolingFilter,
+}
+
+impl Default for ScanInput {
+    fn default() -> Self {
+        Self {
+            scan_roots: Vec::new(),
+            pinned: Vec::new(),
+            max_depth: 0,
+            filter: ToolingFilter::all(),
+        }
+    }
 }
 
 pub fn scan_all(paths: &Paths, input: &ScanInput) -> ScanSnapshot {
     let started = std::time::Instant::now();
     let ctx = ScanContext::load(paths);
-    let global = scan_global_with(&ctx);
+    let filter = &input.filter;
+    let global = scan_global_with(&ctx, filter);
     let mut errors: Vec<ScanError> = Vec::new();
 
     let depth = if input.max_depth == 0 { DEFAULT_MAX_DEPTH } else { input.max_depth };
     let discovered =
-        discover_projects_excluding(&input.scan_roots, depth, &[paths.home.clone()]);
+        discover_projects_excluding(&input.scan_roots, depth, &[paths.home.clone()], filter);
 
     // canonical path → (pinned, discovered)
     let mut all: BTreeMap<String, (bool, bool)> = BTreeMap::new();
@@ -270,7 +297,7 @@ pub fn scan_all(paths: &Paths, input: &ScanInput) -> ScanSnapshot {
     let mut projects: Vec<ProjectBundle> = all
         .iter()
         .map(|(path, (pinned, disc))| {
-            let mut b = scan_project_with(&ctx, Path::new(path));
+            let mut b = scan_project_with(&ctx, Path::new(path), filter);
             b.project.pinned = *pinned;
             b.project.discovered = *disc;
             b

@@ -16,8 +16,10 @@ import {
   resolveProduct,
 } from "@/lib/labels";
 import { relativeTime, shortenPath } from "@/lib/format";
+import { isProductTracked } from "@/lib/tooling";
 import type { BrowserItem } from "@/lib/browser";
 import type { ArtifactKind, Product, Scope } from "@/types/config";
+import { usePreferencesStore } from "@/stores/preferences";
 import ArtifactDetail from "./ArtifactDetail.vue";
 import EmptyState from "./EmptyState.vue";
 import LoadingBlock from "./LoadingBlock.vue";
@@ -56,14 +58,19 @@ const props = withDefaults(
 );
 
 const ui = useUiStore();
+const prefs = usePreferencesStore();
 const { focusArtifactId } = storeToRefs(ui);
 
 const product = ref<Product | "all">("all");
 const kind = ref<string>("all");
 
+const trackedItems = computed(() =>
+  props.items.filter((i) => isProductTracked(prefs.prefs, resolveProduct(i.product))),
+);
+
 const productCounts = computed(() => {
   const m = new Map<Product, number>();
-  for (const i of props.items) {
+  for (const i of trackedItems.value) {
     const p = resolveProduct(i.product);
     m.set(p, (m.get(p) ?? 0) + 1);
   }
@@ -75,8 +82,8 @@ const showProductBadge = computed(() => props.showProduct || showProductFilter.v
 
 const productScoped = computed(() =>
   product.value === "all"
-    ? props.items
-    : props.items.filter((i) => resolveProduct(i.product) === product.value),
+    ? trackedItems.value
+    : trackedItems.value.filter((i) => resolveProduct(i.product) === product.value),
 );
 
 const kindLabel = (k: string) => KIND_PLURAL[k as ArtifactKind] ?? k;

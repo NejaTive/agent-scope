@@ -333,6 +333,16 @@ export interface Preferences {
   notifications: boolean;
   /** Opt-in: allow writing allowlisted config files. Default false. */
   allowEditing: boolean;
+  /** Include Claude Code trees in scan/watch. Default true. */
+  trackClaude: boolean;
+  /** Include Cursor trees in scan/watch. Default true. */
+  trackCursor: boolean;
+}
+
+/** Disk presence of known AI tooling config roots (`get_tooling_presence`). */
+export interface ToolingPresence {
+  claude: boolean;
+  cursor: boolean;
 }
 
 export type AppPreferences = Preferences;

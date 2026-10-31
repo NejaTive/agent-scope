@@ -1,7 +1,17 @@
 //! Resolution of Claude Code / Cursor config locations and the read allowlist.
 
 use crate::errors::{AppError, AppResult};
+use crate::tooling::ToolingFilter;
 use std::path::{Component, Path, PathBuf};
+
+/// How a path maps to an AI tooling product for enable/disable gating.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PathProduct {
+    Claude,
+    Cursor,
+    /// Used by both (e.g. `.agents/skills`, `AGENTS.md`).
+    Shared,
+}
 
 pub const SKIP_DIRS: &[&str] = &[
     "node_modules",
@@ -159,6 +169,85 @@ impl Paths {
                 _ => None,
             })
             .collect()
+    }
+
+    fn classify_path(&self, path: &Path, project_roots: &[PathBuf]) -> Option<PathProduct> {
+        if self.is_claude_json(path) {
+            return Some(PathProduct::Claude);
+        }
+        let cfg = Self::canon_of(&self.config_dir);
+        if path.starts_with(&cfg) {
+            return Some(PathProduct::Claude);
+        }
+        let managed = Self::canon_of(&self.managed_dir);
+        if path.starts_with(&managed) {
+            return Some(PathProduct::Claude);
+        }
+        let cursor = Self::canon_of(&self.cursor_dir);
+        if path.starts_with(&cursor) {
+            return Some(PathProduct::Cursor);
+        }
+        let cursor_managed = Self::canon_of(&self.cursor_managed_hooks);
+        if path == cursor_managed {
+            return Some(PathProduct::Cursor);
+        }
+        if let Some(parent) = self.cursor_managed_hooks.parent() {
+            let parent = Self::canon_of(parent);
+            if path.starts_with(&parent) {
+                return Some(PathProduct::Cursor);
+            }
+        }
+        for root in project_roots {
+            let root = Self::canon_of(root);
+            if let Ok(rel) = path.strip_prefix(&root) {
+                let comps = Self::normal_components(rel);
+                let first = comps.first().map(|s| s.as_str());
+                let name = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                if first == Some(".claude") {
+                    return Some(PathProduct::Claude);
+                }
+                if first == Some(".cursor") {
+                    return Some(PathProduct::Cursor);
+                }
+                if first == Some(".agents") && comps.get(1).map(|s| s.as_str()) == Some("skills") {
+                    return Some(PathProduct::Shared);
+                }
+                if comps.len() == 1 {
+                    if matches!(name.as_str(), "CLAUDE.md" | "CLAUDE.local.md" | ".mcp.json") {
+                        return Some(PathProduct::Claude);
+                    }
+                    if name == "AGENTS.md" {
+                        return Some(PathProduct::Shared);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn assert_product_enabled(
+        &self,
+        path: &Path,
+        project_roots: &[PathBuf],
+        filter: &ToolingFilter,
+    ) -> AppResult<()> {
+        match self.classify_path(path, project_roots) {
+            Some(PathProduct::Claude) if !filter.claude => Err(AppError::AccessDenied(
+                "отслеживание Claude Code выключено".into(),
+            )),
+            Some(PathProduct::Cursor) if !filter.cursor => Err(AppError::AccessDenied(
+                "отслеживание Cursor выключено".into(),
+            )),
+            Some(PathProduct::Shared) if !filter.claude && !filter.cursor => {
+                Err(AppError::AccessDenied(
+                    "отслеживание AI-инструментов выключено".into(),
+                ))
+            }
+            _ => Ok(()),
+        }
     }
 
     /// Read allowlist for an absolute path. File need not exist (used for rename dest).
@@ -335,13 +424,20 @@ impl Paths {
     /// Check that `requested` may be served to the UI.
     /// Returns the canonical path. `.claude.json` is allowed here but callers must
     /// serve a redacted view (see `is_claude_json`).
-    pub fn check_readable(&self, requested: &Path, project_roots: &[PathBuf]) -> AppResult<PathBuf> {
+    /// Paths belonging to a disabled product are rejected.
+    pub fn check_readable(
+        &self,
+        requested: &Path,
+        project_roots: &[PathBuf],
+        filter: &ToolingFilter,
+    ) -> AppResult<PathBuf> {
         let canon = dunce::canonicalize(requested)
             .map_err(|_| AppError::NotFound(requested.display().to_string()))?;
         if !canon.is_file() {
             return Err(AppError::InvalidPath(format!("{} is not a file", canon.display())));
         }
         self.assert_in_read_allowlist(&canon, project_roots)?;
+        self.assert_product_enabled(&canon, project_roots, filter)?;
         Ok(canon)
     }
 
@@ -358,8 +454,13 @@ impl Paths {
 
     /// Writable subset of [`Self::check_readable`]: never credentials, never
     /// `~/.claude.json` (redacted view only), never managed/system paths.
-    pub fn check_writable(&self, requested: &Path, project_roots: &[PathBuf]) -> AppResult<PathBuf> {
-        let canon = self.check_readable(requested, project_roots)?;
+    pub fn check_writable(
+        &self,
+        requested: &Path,
+        project_roots: &[PathBuf],
+        filter: &ToolingFilter,
+    ) -> AppResult<PathBuf> {
+        let canon = self.check_readable(requested, project_roots, filter)?;
         self.assert_writable_extras(&canon)?;
         Ok(canon)
     }
@@ -370,6 +471,7 @@ impl Paths {
         parent: &Path,
         new_name: &str,
         project_roots: &[PathBuf],
+        filter: &ToolingFilter,
     ) -> AppResult<PathBuf> {
         let name = Self::validate_new_basename(new_name)?;
         let parent_canon = dunce::canonicalize(parent).map_err(|_| {
@@ -389,6 +491,7 @@ impl Paths {
             )));
         }
         self.assert_in_read_allowlist(&dest, project_roots)?;
+        self.assert_product_enabled(&dest, project_roots, filter)?;
         self.assert_writable_extras(&dest)?;
         Ok(dest)
     }
@@ -419,6 +522,10 @@ mod tests {
     use std::fs;
     use tempfile::tempdir;
 
+    fn all() -> ToolingFilter {
+        ToolingFilter::all()
+    }
+
     #[test]
     fn allowlist_rules() {
         let dir = tempdir().unwrap();
@@ -438,17 +545,18 @@ mod tests {
         fs::write(proj.join(".env"), "SECRET=1").unwrap();
         fs::write(proj.join(".claude/settings.json"), "{}").unwrap();
         let roots = vec![proj.clone()];
+        let f = all();
 
-        assert!(paths.check_readable(&paths.config_dir.join("settings.json"), &roots).is_ok());
-        assert!(paths.check_readable(&paths.config_dir.join("rules/a.md"), &roots).is_ok());
-        assert!(paths.check_readable(&paths.config_dir.join("projects/x/memory/MEMORY.md"), &roots).is_ok());
-        assert!(paths.check_readable(&paths.config_dir.join("projects/x/transcript.jsonl"), &roots).is_err());
-        assert!(paths.check_readable(&paths.config_dir.join(".credentials.json"), &roots).is_err());
-        assert!(paths.check_readable(&dir.path().join("outside.txt"), &roots).is_err());
-        assert!(paths.check_readable(&proj.join("CLAUDE.md"), &roots).is_ok());
-        assert!(paths.check_readable(&proj.join(".claude/settings.json"), &roots).is_ok());
-        assert!(paths.check_readable(&proj.join(".env"), &roots).is_err());
-        assert!(paths.check_readable(&dir.path().join("nope"), &roots).is_err());
+        assert!(paths.check_readable(&paths.config_dir.join("settings.json"), &roots, &f).is_ok());
+        assert!(paths.check_readable(&paths.config_dir.join("rules/a.md"), &roots, &f).is_ok());
+        assert!(paths.check_readable(&paths.config_dir.join("projects/x/memory/MEMORY.md"), &roots, &f).is_ok());
+        assert!(paths.check_readable(&paths.config_dir.join("projects/x/transcript.jsonl"), &roots, &f).is_err());
+        assert!(paths.check_readable(&paths.config_dir.join(".credentials.json"), &roots, &f).is_err());
+        assert!(paths.check_readable(&dir.path().join("outside.txt"), &roots, &f).is_err());
+        assert!(paths.check_readable(&proj.join("CLAUDE.md"), &roots, &f).is_ok());
+        assert!(paths.check_readable(&proj.join(".claude/settings.json"), &roots, &f).is_ok());
+        assert!(paths.check_readable(&proj.join(".env"), &roots, &f).is_err());
+        assert!(paths.check_readable(&dir.path().join("nope"), &roots, &f).is_err());
     }
 
     #[test]
@@ -476,21 +584,66 @@ mod tests {
         fs::write(proj.join(".agents/skills/foo/SKILL.md"), "x").unwrap();
         fs::write(proj.join(".credentials.json"), "secret").unwrap();
         let roots = vec![proj.clone()];
+        let f = all();
 
-        assert!(paths.check_readable(&paths.cursor_dir.join("mcp.json"), &roots).is_ok());
-        assert!(paths.check_readable(&paths.cursor_dir.join("hooks.json"), &roots).is_ok());
-        assert!(paths.check_readable(&paths.cursor_dir.join("rules/a.mdc"), &roots).is_ok());
-        assert!(paths.check_readable(&paths.cursor_dir.join("skills/s.md"), &roots).is_ok());
-        assert!(paths.check_readable(&paths.cursor_dir.join("hooks/pre.sh"), &roots).is_ok());
-        assert!(paths.check_readable(&paths.cursor_dir.join(".credentials.json"), &roots).is_err());
-        assert!(paths.check_readable(&paths.cursor_dir.join("secrets.txt"), &roots).is_err());
+        assert!(paths.check_readable(&paths.cursor_dir.join("mcp.json"), &roots, &f).is_ok());
+        assert!(paths.check_readable(&paths.cursor_dir.join("hooks.json"), &roots, &f).is_ok());
+        assert!(paths.check_readable(&paths.cursor_dir.join("rules/a.mdc"), &roots, &f).is_ok());
+        assert!(paths.check_readable(&paths.cursor_dir.join("skills/s.md"), &roots, &f).is_ok());
+        assert!(paths.check_readable(&paths.cursor_dir.join("hooks/pre.sh"), &roots, &f).is_ok());
+        assert!(paths.check_readable(&paths.cursor_dir.join(".credentials.json"), &roots, &f).is_err());
+        assert!(paths.check_readable(&paths.cursor_dir.join("secrets.txt"), &roots, &f).is_err());
 
-        assert!(paths.check_readable(&proj.join(".cursor/mcp.json"), &roots).is_ok());
-        assert!(paths.check_readable(&proj.join(".cursor/rules/r.mdc"), &roots).is_ok());
-        assert!(paths.check_readable(&proj.join("AGENTS.md"), &roots).is_ok());
-        assert!(paths.check_readable(&proj.join(".agents/skills/foo/SKILL.md"), &roots).is_ok());
-        assert!(paths.check_readable(&proj.join(".env"), &roots).is_err());
-        assert!(paths.check_readable(&proj.join(".credentials.json"), &roots).is_err());
+        assert!(paths.check_readable(&proj.join(".cursor/mcp.json"), &roots, &f).is_ok());
+        assert!(paths.check_readable(&proj.join(".cursor/rules/r.mdc"), &roots, &f).is_ok());
+        assert!(paths.check_readable(&proj.join("AGENTS.md"), &roots, &f).is_ok());
+        assert!(paths.check_readable(&proj.join(".agents/skills/foo/SKILL.md"), &roots, &f).is_ok());
+        assert!(paths.check_readable(&proj.join(".env"), &roots, &f).is_err());
+        assert!(paths.check_readable(&proj.join(".credentials.json"), &roots, &f).is_err());
+    }
+
+    #[test]
+    fn disabled_product_blocks_read_and_write() {
+        let dir = tempdir().unwrap();
+        let paths = Paths::for_root(dir.path());
+        fs::create_dir_all(paths.config_dir.join("rules")).unwrap();
+        fs::create_dir_all(paths.cursor_dir.join("rules")).unwrap();
+        fs::write(paths.config_dir.join("settings.json"), "{}").unwrap();
+        fs::write(paths.cursor_dir.join("mcp.json"), "{}").unwrap();
+        let proj = dir.path().join("proj");
+        fs::create_dir_all(proj.join(".claude")).unwrap();
+        fs::create_dir_all(proj.join(".cursor")).unwrap();
+        fs::write(proj.join(".claude/settings.json"), "{}").unwrap();
+        fs::write(proj.join(".cursor/mcp.json"), "{}").unwrap();
+        let roots = vec![proj.clone()];
+
+        let no_claude = ToolingFilter {
+            claude: false,
+            cursor: true,
+        };
+        assert!(paths
+            .check_readable(&paths.config_dir.join("settings.json"), &roots, &no_claude)
+            .is_err());
+        assert!(paths
+            .check_readable(&proj.join(".claude/settings.json"), &roots, &no_claude)
+            .is_err());
+        assert!(paths
+            .check_readable(&paths.cursor_dir.join("mcp.json"), &roots, &no_claude)
+            .is_ok());
+
+        let no_cursor = ToolingFilter {
+            claude: true,
+            cursor: false,
+        };
+        assert!(paths
+            .check_writable(&paths.cursor_dir.join("mcp.json"), &roots, &no_cursor)
+            .is_err());
+        assert!(paths
+            .check_writable(&proj.join(".cursor/mcp.json"), &roots, &no_cursor)
+            .is_err());
+        assert!(paths
+            .check_writable(&paths.config_dir.join("settings.json"), &roots, &no_cursor)
+            .is_ok());
     }
 
     #[test]
@@ -541,44 +694,46 @@ mod tests {
         fs::write(proj.join(".claude/settings.json"), "{}").unwrap();
         fs::write(proj.join("CLAUDE.md"), "x").unwrap();
         let roots = vec![proj.clone()];
+        let f = all();
 
         assert!(paths
-            .check_writable(&paths.config_dir.join("settings.json"), &roots)
+            .check_writable(&paths.config_dir.join("settings.json"), &roots, &f)
             .is_ok());
         assert!(paths
-            .check_writable(&paths.config_dir.join("rules/a.md"), &roots)
+            .check_writable(&paths.config_dir.join("rules/a.md"), &roots, &f)
             .is_ok());
         assert!(paths
-            .check_writable(&paths.config_dir.join("skills/s/SKILL.md"), &roots)
+            .check_writable(&paths.config_dir.join("skills/s/SKILL.md"), &roots, &f)
             .is_ok());
         assert!(paths
-            .check_writable(&paths.cursor_dir.join("mcp.json"), &roots)
+            .check_writable(&paths.cursor_dir.join("mcp.json"), &roots, &f)
             .is_ok());
         assert!(paths
-            .check_writable(&paths.cursor_dir.join("hooks.json"), &roots)
+            .check_writable(&paths.cursor_dir.join("hooks.json"), &roots, &f)
             .is_ok());
         assert!(paths
-            .check_writable(&proj.join(".claude/settings.json"), &roots)
+            .check_writable(&proj.join(".claude/settings.json"), &roots, &f)
             .is_ok());
-        assert!(paths.check_writable(&proj.join("CLAUDE.md"), &roots).is_ok());
+        assert!(paths.check_writable(&proj.join("CLAUDE.md"), &roots, &f).is_ok());
 
         assert!(paths
-            .check_writable(&paths.config_dir.join(".credentials.json"), &roots)
+            .check_writable(&paths.config_dir.join(".credentials.json"), &roots, &f)
             .is_err());
-        assert!(paths.check_writable(&paths.claude_json, &roots).is_err());
+        assert!(paths.check_writable(&paths.claude_json, &roots, &f).is_err());
         assert!(paths
-            .check_writable(&dir.path().join("outside.txt"), &roots)
-            .is_err());
-        assert!(paths
-            .check_writable(&paths.managed_dir.join("settings.json"), &roots)
+            .check_writable(&dir.path().join("outside.txt"), &roots, &f)
             .is_err());
         assert!(paths
-            .check_writable(&paths.cursor_managed_hooks, &roots)
+            .check_writable(&paths.managed_dir.join("settings.json"), &roots, &f)
+            .is_err());
+        assert!(paths
+            .check_writable(&paths.cursor_managed_hooks, &roots, &f)
             .is_err());
         assert!(paths
             .check_writable(
                 &paths.cursor_managed_hooks.parent().unwrap().join("hooks/pre.sh"),
-                &roots
+                &roots,
+                &f
             )
             .is_err());
     }
@@ -595,25 +750,26 @@ mod tests {
         fs::create_dir_all(&proj).unwrap();
         fs::write(proj.join("CLAUDE.md"), "x").unwrap();
         let roots = vec![proj.clone()];
+        let f = all();
 
         let rules = paths.config_dir.join("rules");
         assert!(paths
-            .check_writable_destination(&rules, "b.md", &roots)
+            .check_writable_destination(&rules, "b.md", &roots, &f)
             .is_ok());
         assert!(paths
-            .check_writable_destination(&rules, "exists.md", &roots)
+            .check_writable_destination(&rules, "exists.md", &roots, &f)
             .is_err());
         assert!(paths
-            .check_writable_destination(&rules, "../outside.md", &roots)
+            .check_writable_destination(&rules, "../outside.md", &roots, &f)
             .is_err());
         assert!(paths
-            .check_writable_destination(&rules, "foo/bar.md", &roots)
+            .check_writable_destination(&rules, "foo/bar.md", &roots, &f)
             .is_err());
         assert!(paths
-            .check_writable_destination(&proj, "FOO.md", &roots)
+            .check_writable_destination(&proj, "FOO.md", &roots, &f)
             .is_err());
         assert!(paths
-            .check_writable_destination(&proj, "AGENTS.md", &roots)
+            .check_writable_destination(&proj, "AGENTS.md", &roots, &f)
             .is_ok());
     }
 }

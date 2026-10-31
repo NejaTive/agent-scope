@@ -2,11 +2,13 @@
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
+import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import { useUiStore } from "@/stores/ui";
 import { matchesQuery } from "@/composables/useSearch";
 import { shortenPath } from "@/lib/format";
 import { RU, pluralCount, type RuForms } from "@/lib/plural";
+import { trackedDirLabels, trackedProductLabels } from "@/lib/tooling";
 import type { ProjectInfo } from "@/types/config";
 import Badge from "@/components/common/Badge.vue";
 import ProductBadge from "@/components/common/ProductBadge.vue";
@@ -23,8 +25,21 @@ function hasCursor(p: ProjectInfo) {
 }
 
 const scan = useScanStore();
+const prefs = usePreferencesStore();
 const router = useRouter();
 const { search } = storeToRefs(useUiStore());
+
+const trackedDirs = computed(() =>
+  trackedDirLabels(prefs.prefs)
+    .split(" / ")
+    .filter(Boolean),
+);
+
+const emptyProjectsDescription = computed(() =>
+  scan.projects.length
+    ? "Очистите поиск, чтобы увидеть все проекты."
+    : `Добавьте папку проекта или корень сканирования, чтобы начать просмотр конфигурации ${trackedProductLabels(prefs.prefs)}.`,
+);
 
 const pendingRemove = ref<ProjectInfo | null>(null);
 const pendingRemoveRoot = ref<string | null>(null);
@@ -85,7 +100,11 @@ async function confirmRemoveRoot() {
         <h2 class="label mb-2">Корни сканирования ({{ scan.scanRoots.length }})</h2>
         <div v-if="!scan.scanRoots.length" class="card px-3 py-2 text-xs text-muted">
           Нет корней сканирования. Добавьте папку (например <span class="font-mono">~/Projects</span>), чтобы автоматически находить проекты
-          с <span class="font-mono">.claude</span> или <span class="font-mono">.cursor</span>.
+          с
+          <template v-for="(dir, i) in trackedDirs" :key="dir">
+            <span v-if="i > 0"> или </span>
+            <span class="font-mono">{{ dir }}</span>
+          </template>.
         </div>
         <ul v-else class="card divide-y divide-line">
           <li v-for="r in scan.scanRoots" :key="r.path" class="flex items-center gap-2 px-3 py-1.5">
@@ -112,11 +131,7 @@ async function confirmRemoveRoot() {
           <EmptyState
             icon="folder"
             :title="scan.projects.length ? 'Нет подходящих проектов' : 'Пока нет проектов'"
-            :description="
-              scan.projects.length
-                ? 'Очистите поиск, чтобы увидеть все проекты.'
-                : 'Добавьте папку проекта или корень сканирования, чтобы начать просмотр конфигурации Claude Code и Cursor.'
-            "
+            :description="emptyProjectsDescription"
           />
         </div>
         <ul v-else class="card divide-y divide-line">
@@ -124,8 +139,8 @@ async function confirmRemoveRoot() {
             <button type="button" class="flex min-w-0 flex-1 flex-col gap-0.5 text-left" @click="open(p)">
               <span class="flex items-center gap-2">
                 <span class="truncate text-[13px] font-medium">{{ p.name }}</span>
-                <ProductBadge v-if="hasClaude(p)" product="claude" />
-                <ProductBadge v-if="hasCursor(p)" product="cursor" />
+                <ProductBadge v-if="prefs.prefs.trackClaude && hasClaude(p)" product="claude" />
+                <ProductBadge v-if="prefs.prefs.trackCursor && hasCursor(p)" product="cursor" />
               </span>
               <span class="truncate font-mono text-2xs text-subtle" :title="p.path">{{ shortenPath(p.path) }}</span>
             </button>

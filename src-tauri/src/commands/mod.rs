@@ -8,6 +8,7 @@ use crate::paths::language_for;
 use crate::resolver;
 use crate::scanner::{self, discovery};
 use crate::state::{self, AppState};
+use crate::tooling::{ToolingFilter, ToolingPresence};
 use crate::updates;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -154,7 +155,8 @@ pub async fn pick_directory(app: AppHandle) -> Result<Option<String>, AppError> 
 /// Read an artifact's text, only from allowlisted locations. JSON is secret-masked.
 pub fn read_artifact_content(state: &AppState, path: &str) -> AppResult<ArtifactContent> {
     let roots = state.project_roots();
-    let canon = state.paths.check_readable(Path::new(path), &roots)?;
+    let filter = state.tooling_filter();
+    let canon = state.paths.check_readable(Path::new(path), &roots, &filter)?;
     let meta = std::fs::metadata(&canon)?;
     if meta.len() > MAX_CONTENT_BYTES {
         return Err(AppError::InvalidPath(format!(
@@ -199,7 +201,8 @@ fn require_editing_enabled(state: &AppState) -> AppResult<()> {
 pub fn read_artifact_content_for_edit(state: &AppState, path: &str) -> AppResult<ArtifactContentForEdit> {
     require_editing_enabled(state)?;
     let roots = state.project_roots();
-    let canon = state.paths.check_writable(Path::new(path), &roots)?;
+    let filter = state.tooling_filter();
+    let canon = state.paths.check_writable(Path::new(path), &roots, &filter)?;
     let meta = std::fs::metadata(&canon)?;
     if meta.len() > MAX_CONTENT_BYTES {
         return Err(AppError::InvalidPath(format!(
@@ -238,7 +241,8 @@ pub fn write_artifact_content(
 ) -> AppResult<SaveArtifactResult> {
     require_editing_enabled(state)?;
     let roots = state.project_roots();
-    let canon = state.paths.check_writable(Path::new(path), &roots)?;
+    let filter = state.tooling_filter();
+    let canon = state.paths.check_writable(Path::new(path), &roots, &filter)?;
 
     if content.len() as u64 > MAX_CONTENT_BYTES {
         return Err(AppError::InvalidPath(format!(
@@ -327,7 +331,8 @@ pub fn rename_artifact_file(
 ) -> AppResult<RenameArtifactResult> {
     require_editing_enabled(state)?;
     let roots = state.project_roots();
-    let canon = state.paths.check_writable(Path::new(path), &roots)?;
+    let filter = state.tooling_filter();
+    let canon = state.paths.check_writable(Path::new(path), &roots, &filter)?;
     check_expected_hash(&canon, expected_hash)?;
 
     let parent = canon.parent().ok_or_else(|| {
@@ -335,7 +340,7 @@ pub fn rename_artifact_file(
     })?;
     let dest = state
         .paths
-        .check_writable_destination(parent, new_name, &roots)?;
+        .check_writable_destination(parent, new_name, &roots, &filter)?;
 
     std::fs::rename(&canon, &dest)?;
     let new_path = dest.to_string_lossy().to_string();
@@ -369,7 +374,8 @@ pub fn delete_artifact_file(
 ) -> AppResult<DeleteArtifactResult> {
     require_editing_enabled(state)?;
     let roots = state.project_roots();
-    let canon = state.paths.check_writable(Path::new(path), &roots)?;
+    let filter = state.tooling_filter();
+    let canon = state.paths.check_writable(Path::new(path), &roots, &filter)?;
     check_expected_hash(&canon, expected_hash)?;
 
     let deleted_path = canon.to_string_lossy().to_string();
@@ -478,9 +484,26 @@ pub fn set_preferences(prefs: Preferences, state: State<'_, AppState>) -> Result
     if !matches!(prefs.theme.as_str(), "light" | "dark" | "system") {
         return Err(AppError::Other(format!("unknown theme `{}`", prefs.theme)));
     }
-    let db = state.db.lock();
-    db.set_preferences(&prefs)?;
-    db.get_preferences()
+    ToolingFilter::validate_prefs(&prefs)?;
+    let track_changed = {
+        let db = state.db.lock();
+        let old = db.get_preferences()?;
+        let changed =
+            old.track_claude != prefs.track_claude || old.track_cursor != prefs.track_cursor;
+        db.set_preferences(&prefs)?;
+        let got = db.get_preferences()?;
+        (changed, got)
+    };
+    if track_changed.0 {
+        state.invalidate();
+    }
+    Ok(track_changed.1)
+}
+
+/// Whether typical Claude / Cursor config roots exist on disk (for UI hints).
+#[tauri::command]
+pub fn get_tooling_presence(state: State<'_, AppState>) -> ToolingPresence {
+    ToolingPresence::probe(&state.paths)
 }
 
 #[cfg(test)]
@@ -562,6 +585,48 @@ mod tests {
     #[test]
     fn app_info_name() {
         assert_eq!(get_app_info().name, "Agent Scope");
+    }
+
+    #[test]
+    fn set_preferences_rejects_both_track_off() {
+        let mut bad = Preferences::default();
+        assert!(bad.track_claude && bad.track_cursor);
+        bad.track_claude = false;
+        bad.track_cursor = false;
+        let err = ToolingFilter::validate_prefs(&bad).unwrap_err();
+        assert!(err.to_string().contains("хотя бы один"));
+    }
+
+    #[test]
+    fn set_preferences_invalidates_on_track_change() {
+        let (_d, st, _p) = fixture();
+        st.with_snapshot(|_| ()).unwrap();
+        assert!(st.snapshot.lock().is_some());
+        let mut prefs = st.db.lock().get_preferences().unwrap();
+        prefs.track_cursor = false;
+        // Mirror set_preferences command: validate → persist → invalidate on track* change.
+        ToolingFilter::validate_prefs(&prefs).unwrap();
+        let track_changed = {
+            let db = st.db.lock();
+            let old = db.get_preferences().unwrap();
+            let changed =
+                old.track_claude != prefs.track_claude || old.track_cursor != prefs.track_cursor;
+            db.set_preferences(&prefs).unwrap();
+            changed
+        };
+        assert!(track_changed);
+        st.invalidate();
+        assert!(st.snapshot.lock().is_none());
+        let got = st.db.lock().get_preferences().unwrap();
+        assert!(got.track_claude && !got.track_cursor);
+    }
+
+    #[test]
+    fn tooling_presence_probes_roots() {
+        let (_d, st, _p) = fixture();
+        // fixture creates config_dir via Paths::for_root + credentials write
+        let presence = ToolingPresence::probe(&st.paths);
+        assert!(presence.claude);
     }
 
     fn enable_editing(st: &AppState) {

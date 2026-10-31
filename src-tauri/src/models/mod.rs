@@ -555,6 +555,10 @@ pub struct Preferences {
     pub notifications: bool,
     /// Opt-in: allow writing allowlisted config files via Edit mode.
     pub allow_editing: bool,
+    /// Include Claude Code locations in scan / watch / allowlist. Default true.
+    pub track_claude: bool,
+    /// Include Cursor locations in scan / watch / allowlist. Default true.
+    pub track_cursor: bool,
 }
 
 impl Default for Preferences {
@@ -564,6 +568,8 @@ impl Default for Preferences {
             watch_on_start: false,
             notifications: false,
             allow_editing: false,
+            track_claude: true,
+            track_cursor: true,
         }
     }
 }

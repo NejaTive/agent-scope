@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { ipc } from "@/lib/ipc";
 import { errMsg } from "@/lib/normalize";
 import type { Preferences, ThemePreference } from "@/types/config";
+import { useScanStore } from "./scan";
 
 const LS_KEY = "agent-scope:preferences";
 
@@ -11,9 +12,14 @@ const DEFAULTS: Preferences = {
   watchOnStart: false,
   notifications: false,
   allowEditing: false,
+  trackClaude: true,
+  trackCursor: true,
 };
 
 const THEMES: ThemePreference[] = ["dark", "light", "system"];
+
+const LAST_TOOLING_ERROR =
+  "Нужно оставить включённым хотя бы один AI-инструмент";
 
 function sanitize(p: Partial<Preferences>): Partial<Preferences> {
   const out: Partial<Preferences> = {};
@@ -21,6 +27,8 @@ function sanitize(p: Partial<Preferences>): Partial<Preferences> {
   if (typeof p.watchOnStart === "boolean") out.watchOnStart = p.watchOnStart;
   if (typeof p.notifications === "boolean") out.notifications = p.notifications;
   if (typeof p.allowEditing === "boolean") out.allowEditing = p.allowEditing;
+  if (typeof p.trackClaude === "boolean") out.trackClaude = p.trackClaude;
+  if (typeof p.trackCursor === "boolean") out.trackCursor = p.trackCursor;
   return out;
 }
 
@@ -73,10 +81,22 @@ export const usePreferencesStore = defineStore("preferences", () => {
   }
 
   async function update(patch: Partial<Preferences>) {
+    const next: Preferences = { ...prefs.value, ...patch };
+    if (!next.trackClaude && !next.trackCursor) {
+      error.value = LAST_TOOLING_ERROR;
+      return;
+    }
+
+    const prev = { ...prefs.value };
     const watchChanged =
       patch.watchOnStart !== undefined && patch.watchOnStart !== prefs.value.watchOnStart;
-    prefs.value = { ...prefs.value, ...patch };
+    const toolingChanged =
+      (patch.trackClaude !== undefined && patch.trackClaude !== prefs.value.trackClaude) ||
+      (patch.trackCursor !== undefined && patch.trackCursor !== prefs.value.trackCursor);
+
+    prefs.value = next;
     writeLocal(prefs.value);
+    let savedOk = false;
     try {
       const saved = await ipc.setPreferences({ ...prefs.value });
       if (saved && typeof saved === "object") {
@@ -84,10 +104,23 @@ export const usePreferencesStore = defineStore("preferences", () => {
         writeLocal(prefs.value);
       }
       error.value = null;
+      savedOk = true;
     } catch (e) {
       error.value = errMsg(e);
+      // Backend rejected — revert optimistic patch.
+      prefs.value = prev;
+      writeLocal(prefs.value);
     }
+    if (!savedOk) return;
     if (watchChanged) await applyWatching(prefs.value.watchOnStart);
+    if (toolingChanged) {
+      const scan = useScanStore();
+      await scan.refresh({ silent: true });
+      if (prefs.value.watchOnStart) {
+        await applyWatching(false);
+        await applyWatching(true);
+      }
+    }
   }
 
   function setTheme(theme: ThemePreference) {

@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import { useUiStore } from "@/stores/ui";
 import type { BrowserItem } from "@/lib/browser";
+import { trackedPathHint } from "@/lib/tooling";
 import type { SkillEntry, UiSkill } from "@/types/config";
 import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
 import FieldList from "@/components/common/FieldList.vue";
 
 const scan = useScanStore();
+const prefs = usePreferencesStore();
 const ui = useUiStore();
 const tab = ref<"skill" | "command">("skill");
 
@@ -52,6 +55,14 @@ const items = computed<BrowserItem[]>(() =>
       .join(" "),
   })),
 );
+
+const emptyDescription = computed(() => {
+  const skills = trackedPathHint(prefs.prefs, "skills/<name>/SKILL.md");
+  const cmd = prefs.prefs.trackClaude
+    ? "; команды — в .claude/commands/"
+    : "";
+  return `Скиллы лежат в ${skills}${cmd}. Запустите сканирование после добавления корней проектов.`;
+});
 </script>
 
 <template>
@@ -59,7 +70,7 @@ const items = computed<BrowserItem[]>(() =>
     :items="items"
     :loading="!scan.initialized"
     :empty-title="tab === 'skill' ? 'Скиллы не найдены' : 'Команды не найдены'"
-    empty-description="Скиллы лежат в .claude/skills/<name>/SKILL.md и .cursor/skills/<name>/SKILL.md; команды — в .claude/commands/. Запустите сканирование после добавления корней проектов."
+    :empty-description="emptyDescription"
   >
     <template #header>
       <div class="flex shrink-0 items-center gap-0.5 border-b border-line px-2 py-1.5" role="tablist">

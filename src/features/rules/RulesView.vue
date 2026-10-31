@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import type { BrowserItem } from "@/lib/browser";
+import { PRODUCT_DIR_LABEL } from "@/lib/labels";
 import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
 import FieldList from "@/components/common/FieldList.vue";
 
 const scan = useScanStore();
+const prefs = usePreferencesStore();
 const byId = computed(() => new Map(scan.rules.map((r) => [r.id, r])));
 
 const items = computed<BrowserItem[]>(() =>
@@ -24,6 +27,14 @@ const items = computed<BrowserItem[]>(() =>
     searchText: (r.paths ?? []).join(" "),
   })),
 );
+
+const emptyDescription = computed(() => {
+  const parts: string[] = [];
+  if (prefs.prefs.trackClaude) parts.push(`${PRODUCT_DIR_LABEL.claude}/rules/*.md`);
+  if (prefs.prefs.trackCursor) parts.push(`${PRODUCT_DIR_LABEL.cursor}/rules/*.mdc`);
+  const where = parts.length ? parts.join(" и ") : "каталогах правил";
+  return `Правила лежат в ${where} на уровне пользователя или проекта.`;
+});
 </script>
 
 <template>
@@ -31,7 +42,7 @@ const items = computed<BrowserItem[]>(() =>
     :items="items"
     :loading="!scan.initialized"
     empty-title="Правила не найдены"
-    empty-description="Правила лежат в .claude/rules/*.md и .cursor/rules/*.mdc на уровне пользователя или проекта."
+    :empty-description="emptyDescription"
   >
     <template #detail="{ item }">
       <FieldList
