@@ -1,7 +1,7 @@
 {
   "name": "agent-scope",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "license": "MIT",
   "description": "Local desktop app to inspect and optionally edit Claude Code and Cursor agent configuration",
   "type": "module",

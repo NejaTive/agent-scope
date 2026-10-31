@@ -293,7 +293,7 @@ async function openRelease() {
           <dt class="text-subtle">Название</dt>
           <dd>{{ scan.appInfo?.name ?? "Agent Scope" }}</dd>
           <dt class="text-subtle">Версия</dt>
-          <dd class="font-mono">{{ scan.appInfo?.version ?? "0.4.0" }}</dd>
+          <dd class="font-mono">{{ scan.appInfo?.version ?? "0.5.0" }}</dd>
           <template v-if="prefs.prefs.trackClaude && scan.globalMeta.configDir">
             <dt class="text-subtle">Каталог Claude Code</dt>
             <dd class="break-all font-mono">
