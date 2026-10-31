@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <img src="../assets/dashboard.png" width="800" alt="Обзор">
+  <img src="../assets/overview.png" width="800" alt="Обзор">
 </p>
 
 ---
