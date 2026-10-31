@@ -7,7 +7,6 @@
 #   APPLE_ID
 #   APPLE_TEAM_ID
 #   APPLE_APP_SPECIFIC_PASSWORD    # or App Store Connect API key instead
-# See docs/homebrew.md § «Секреты Apple».
 
 name: Release
 
