@@ -127,7 +127,7 @@ const status = computed(() => {
           <span class="truncate">{{ status.text }}</span>
         </span>
         <RouterLink to="/app-settings" class="font-mono hover:text-fg" title="Настройки приложения">
-          v{{ scan.appInfo?.version ?? "0.3.2" }}
+          v{{ scan.appInfo?.version ?? "0.4.0" }}
         </RouterLink>
       </div>
     </div>
