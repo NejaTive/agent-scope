@@ -99,12 +99,15 @@ impl Storage {
         if let Some(v) = self.get_pref("allowEditing")? {
             p.allow_editing = v == "true";
         }
-        // Missing keys → true (Default), so older DBs keep both products on.
+        // Missing keys → true (Default), so older DBs keep products on.
         if let Some(v) = self.get_pref("trackClaude")? {
             p.track_claude = v == "true";
         }
         if let Some(v) = self.get_pref("trackCursor")? {
             p.track_cursor = v == "true";
+        }
+        if let Some(v) = self.get_pref("trackCodex")? {
+            p.track_codex = v == "true";
         }
         Ok(p)
     }
@@ -117,6 +120,7 @@ impl Storage {
         self.set_pref("allowEditing", &p.allow_editing.to_string())?;
         self.set_pref("trackClaude", &p.track_claude.to_string())?;
         self.set_pref("trackCursor", &p.track_cursor.to_string())?;
+        self.set_pref("trackCodex", &p.track_codex.to_string())?;
         Ok(())
     }
 
@@ -232,16 +236,21 @@ mod tests {
             allow_editing: true,
             track_claude: true,
             track_cursor: false,
+            track_codex: true,
         };
         s.set_preferences(&p).unwrap();
         let got = s.get_preferences().unwrap();
         assert_eq!(got.theme, "dark");
         assert_eq!(got.locale, "en");
         assert!(got.watch_on_start && got.notifications && got.allow_editing);
-        assert!(got.track_claude && !got.track_cursor);
+        assert!(got.track_claude && !got.track_cursor && got.track_codex);
         assert!(!Preferences::default().allow_editing);
         assert_eq!(Preferences::default().locale, "ru");
-        assert!(Preferences::default().track_claude && Preferences::default().track_cursor);
+        assert!(
+            Preferences::default().track_claude
+                && Preferences::default().track_cursor
+                && Preferences::default().track_codex
+        );
         s.set_pref("theme", "light").unwrap();
         assert_eq!(s.get_pref("theme").unwrap().as_deref(), Some("light"));
     }
@@ -251,7 +260,7 @@ mod tests {
         let s = Storage::open_in_memory().unwrap();
         s.set_pref("theme", "dark").unwrap();
         let got = s.get_preferences().unwrap();
-        assert!(got.track_claude && got.track_cursor);
+        assert!(got.track_claude && got.track_cursor && got.track_codex);
     }
 
     #[test]

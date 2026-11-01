@@ -32,13 +32,13 @@ pub fn kind_str(kind: &EventKind) -> Option<&'static str> {
     }
 }
 
-/// Claude-ish project root files (not shared with Cursor).
+/// Claude-ish project root files (not shared with Cursor / Codex).
 const CLAUDE_PROJECT_FILES: &[&str] = &["CLAUDE.md", "CLAUDE.local.md", ".mcp.json"];
 
 /// Which changed paths are worth reporting.
 pub fn is_relevant(path: &Path, paths: &Paths, project_roots: &[PathBuf], filter: &ToolingFilter) -> bool {
     let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-    if name == ".DS_Store" || name == ".credentials.json" || name.ends_with('~') || name.ends_with(".swp")
+    if name == ".DS_Store" || name == ".credentials.json" || name == "auth.json" || name.ends_with('~') || name.ends_with(".swp")
         || name.ends_with(".tmp") || name.starts_with(".#")
     {
         return false;
@@ -76,8 +76,21 @@ pub fn is_relevant(path: &Path, paths: &Paths, project_roots: &[PathBuf], filter
             );
         }
     }
-    // User-level `~/.agents/skills` — shared; keep if either product is enabled.
-    if filter.claude || filter.cursor {
+    if filter.codex {
+        if path.starts_with(&paths.codex_admin_skills) {
+            return true;
+        }
+        if let Ok(rel) = path.strip_prefix(&paths.codex_dir) {
+            let comps: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
+            return matches!(
+                comps.first().map(|s| s.as_str()),
+                Some("config.toml") | Some("AGENTS.md") | Some("AGENTS.override.md") | Some("hooks.json")
+                    | Some("hooks") | Some("skills")
+            );
+        }
+    }
+    // User-level `~/.agents/skills` — shared; keep if any tracked product uses it.
+    if filter.allows_shared() {
         if let Ok(rel) = path.strip_prefix(&paths.home.join(".agents")) {
             let comps: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
             if comps.first().map(|s| s.as_str()) == Some("skills") {
@@ -95,15 +108,18 @@ pub fn is_relevant(path: &Path, paths: &Paths, project_roots: &[PathBuf], filter
             if first == Some(".cursor") {
                 return filter.cursor;
             }
+            if first == Some(".codex") {
+                return filter.codex;
+            }
             if first == Some(".agents") && comps.get(1).map(|s| s.as_str()) == Some("skills") {
-                return filter.claude || filter.cursor;
+                return filter.allows_shared();
             }
             if comps.len() == 1 && PROJECT_FILE_NAMES.contains(&name.as_str()) {
                 if CLAUDE_PROJECT_FILES.contains(&name.as_str()) {
                     return filter.claude;
                 }
-                // AGENTS.md is shared.
-                return filter.claude || filter.cursor;
+                // AGENTS.md / AGENTS.override.md are shared.
+                return filter.allows_shared();
             }
         }
     }
@@ -144,8 +160,17 @@ pub fn watch_targets(
             push(parent.to_path_buf(), RecursiveMode::NonRecursive);
         }
     }
-    // Shared agents skills — keep if either product is enabled.
-    if filter.claude || filter.cursor {
+    if filter.codex {
+        // Codex home: config.toml / hooks.json / AGENTS*.md (non-recursive) + skill / hook subtrees.
+        // `auth.json`, sessions and logs live here too — filtered out in `is_relevant`.
+        push(paths.codex_dir.clone(), RecursiveMode::NonRecursive);
+        for sub in ["skills", "hooks"] {
+            push(paths.codex_dir.join(sub), RecursiveMode::Recursive);
+        }
+        push(paths.codex_admin_skills.clone(), RecursiveMode::Recursive);
+    }
+    // Shared agents skills — keep if any tracked product uses them.
+    if filter.allows_shared() {
         push(paths.home.join(".agents/skills"), RecursiveMode::Recursive);
     }
     for root in project_roots {
@@ -156,7 +181,10 @@ pub fn watch_targets(
         if filter.cursor {
             push(root.join(".cursor"), RecursiveMode::Recursive);
         }
-        if filter.claude || filter.cursor {
+        if filter.codex {
+            push(root.join(".codex"), RecursiveMode::Recursive);
+        }
+        if filter.allows_shared() {
             push(root.join(".agents/skills"), RecursiveMode::Recursive);
         }
     }
@@ -239,6 +267,8 @@ fn canonical_paths(p: &Paths) -> Paths {
         cursor_mcp_json,
         cursor_hooks_json,
         cursor_managed_hooks,
+        codex_dir: canon(&p.codex_dir),
+        codex_admin_skills: canon(&p.codex_admin_skills),
     }
 }
 
@@ -362,11 +392,72 @@ mod tests {
         let cursor_off = ToolingFilter {
             claude: true,
             cursor: false,
+            codex: false,
         };
         assert!(!is_relevant(&paths.cursor_dir.join("rules/a.mdc"), &paths, &roots, &cursor_off));
         assert!(!is_relevant(&proj.join(".cursor/skills/x/SKILL.md"), &paths, &roots, &cursor_off));
         assert!(is_relevant(&proj.join(".agents/skills/y/SKILL.md"), &paths, &roots, &cursor_off));
         assert!(is_relevant(&paths.config_dir.join("settings.json"), &paths, &roots, &cursor_off));
+    }
+
+    #[test]
+    fn relevance_codex() {
+        let d = tempdir().unwrap();
+        let paths = Paths::for_root(d.path());
+        let proj = d.path().join("proj");
+        let roots = vec![proj.clone()];
+        let f = all();
+        assert!(is_relevant(&paths.codex_dir.join("config.toml"), &paths, &roots, &f));
+        assert!(is_relevant(&paths.codex_dir.join("AGENTS.md"), &paths, &roots, &f));
+        assert!(is_relevant(&paths.codex_dir.join("AGENTS.override.md"), &paths, &roots, &f));
+        assert!(is_relevant(&paths.codex_dir.join("hooks.json"), &paths, &roots, &f));
+        assert!(is_relevant(&paths.codex_dir.join("skills/x/SKILL.md"), &paths, &roots, &f));
+        assert!(is_relevant(&paths.codex_admin_skills.join("y/SKILL.md"), &paths, &roots, &f));
+        assert!(is_relevant(&proj.join(".codex/config.toml"), &paths, &roots, &f));
+        assert!(is_relevant(&proj.join("AGENTS.override.md"), &paths, &roots, &f));
+        assert!(!is_relevant(&paths.codex_dir.join("auth.json"), &paths, &roots, &f));
+        assert!(!is_relevant(&paths.codex_dir.join("sessions/a.jsonl"), &paths, &roots, &f));
+        assert!(!is_relevant(&paths.codex_dir.join("history.jsonl"), &paths, &roots, &f));
+
+        // Codex off: codex-only paths drop, shared paths stay via Claude/Cursor.
+        let codex_off = ToolingFilter { claude: true, cursor: true, codex: false };
+        assert!(!is_relevant(&paths.codex_dir.join("config.toml"), &paths, &roots, &codex_off));
+        assert!(!is_relevant(&proj.join(".codex/config.toml"), &paths, &roots, &codex_off));
+        assert!(is_relevant(&proj.join(".agents/skills/y/SKILL.md"), &paths, &roots, &codex_off));
+
+        // Codex only: shared paths stay relevant, other products drop.
+        let codex_only = ToolingFilter { claude: false, cursor: false, codex: true };
+        assert!(is_relevant(&proj.join("AGENTS.md"), &paths, &roots, &codex_only));
+        assert!(is_relevant(&proj.join(".agents/skills/y/SKILL.md"), &paths, &roots, &codex_only));
+        assert!(is_relevant(&paths.home.join(".agents/skills/z/SKILL.md"), &paths, &roots, &codex_only));
+        assert!(!is_relevant(&proj.join("CLAUDE.md"), &paths, &roots, &codex_only));
+        assert!(!is_relevant(&paths.config_dir.join("settings.json"), &paths, &roots, &codex_only));
+        assert!(!is_relevant(&proj.join(".cursor/rules/a.mdc"), &paths, &roots, &codex_only));
+    }
+
+    #[test]
+    fn targets_codex() {
+        let d = tempdir().unwrap();
+        let paths = Paths::for_root(d.path());
+        std::fs::create_dir_all(paths.codex_dir.join("skills")).unwrap();
+        std::fs::create_dir_all(paths.home.join(".agents/skills")).unwrap();
+        let proj = d.path().join("p");
+        std::fs::create_dir_all(proj.join(".codex")).unwrap();
+        std::fs::create_dir_all(proj.join(".agents/skills")).unwrap();
+
+        let codex_only = ToolingFilter { claude: false, cursor: false, codex: true };
+        let t = watch_targets(&paths, &[proj.clone()], &codex_only);
+        assert!(t.iter().any(|(p, m)| p == &paths.codex_dir && *m == RecursiveMode::NonRecursive));
+        assert!(t.iter().any(|(p, m)| p == &paths.codex_dir.join("skills") && *m == RecursiveMode::Recursive));
+        assert!(t.iter().any(|(p, _)| p == &paths.home.join(".agents/skills")));
+        assert!(t.iter().any(|(p, _)| p == &proj.join(".codex")));
+        assert!(t.iter().any(|(p, _)| p == &proj.join(".agents/skills")));
+
+        let codex_off = ToolingFilter { claude: true, cursor: false, codex: false };
+        let t = watch_targets(&paths, &[proj.clone()], &codex_off);
+        assert!(!t.iter().any(|(p, _)| p == &paths.codex_dir));
+        assert!(!t.iter().any(|(p, _)| p == &proj.join(".codex")));
+        assert!(t.iter().any(|(p, _)| p == &proj.join(".agents/skills")));
     }
 
     #[test]
@@ -388,6 +479,7 @@ mod tests {
         let claude_only = ToolingFilter {
             claude: true,
             cursor: false,
+            codex: false,
         };
         let t = watch_targets(&paths, &[proj.clone()], &claude_only);
         assert!(t.iter().any(|(p, _)| p == &proj.join(".claude")));

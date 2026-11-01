@@ -66,6 +66,7 @@ export default {
     version: "Версия",
     claudeDir: "Каталог Claude Code",
     cursorDir: "Каталог Cursor",
+    codexDir: "Каталог Codex",
     managedDir: "Управляемый каталог",
     backend: "Бэкенд",
     backendConnected: "подключён",
@@ -354,7 +355,7 @@ export default {
   hooks: {
     emptyTitle: "Хуки не настроены",
     emptyHint:
-      "Хуки объявляются в settings.json (пользователь, проект или локальный) и в плагинах.",
+      "Хуки объявляются в settings.json (пользователь, проект или локальный), hooks.json (Codex) и в плагинах.",
     sourceFile: "Исходный файл",
     hook: "Хук",
     event: "Событие",

@@ -9,6 +9,7 @@ const props = defineProps<{ product?: Product | null }>();
 const TONE: Record<Product, Tone> = {
   claude: "info",
   cursor: "accent",
+  codex: "ok",
 };
 
 const resolved = computed(() => resolveProduct(props.product));

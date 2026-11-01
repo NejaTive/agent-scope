@@ -32,7 +32,10 @@ const items = computed<BrowserItem[]>(() =>
 );
 
 const emptyDescription = computed(() => {
-  const parts = trackedProviders(prefs.prefs).map((p) => `${PRODUCT_DIR_LABEL[p.id]}/agents/*.md`);
+  // Subagent dirs are scanned for Claude Code and Cursor only (no Codex equivalent).
+  const parts = trackedProviders(prefs.prefs)
+    .filter((p) => p.id !== "codex")
+    .map((p) => `${PRODUCT_DIR_LABEL[p.id]}/agents/*.md`);
   const where =
     parts.length === 0
       ? "agents/*.md"

@@ -9,7 +9,8 @@ use std::path::{Component, Path, PathBuf};
 enum PathProduct {
     Claude,
     Cursor,
-    /// Used by both (e.g. `.agents/skills`, `AGENTS.md`).
+    Codex,
+    /// Shared across products (e.g. `.agents/skills`, bare `AGENTS.md`).
     Shared,
 }
 
@@ -35,6 +36,7 @@ pub const PROJECT_FILE_NAMES: &[&str] = &[
     "CLAUDE.md",
     "CLAUDE.local.md",
     "AGENTS.md",
+    "AGENTS.override.md",
     ".mcp.json",
 ];
 
@@ -63,6 +65,16 @@ const CURSOR_DIR_ALLOWED: &[&str] = &[
     "hooks", // adjacent hook scripts
 ];
 
+/// Top-level entries of `CODEX_HOME` / `~/.codex` that may be read (never `auth.json`).
+const CODEX_DIR_ALLOWED: &[&str] = &[
+    "config.toml",
+    "AGENTS.md",
+    "AGENTS.override.md",
+    "hooks.json",
+    "hooks", // adjacent hook scripts
+    "skills", // legacy skill root
+];
+
 #[derive(Debug, Clone)]
 pub struct Paths {
     pub home: PathBuf,
@@ -79,6 +91,10 @@ pub struct Paths {
     pub cursor_hooks_json: PathBuf,
     /// Managed Cursor hooks (macOS Application Support / Windows ProgramData / Linux `/etc`).
     pub cursor_managed_hooks: PathBuf,
+    /// `CODEX_HOME` or `~/.codex`
+    pub codex_dir: PathBuf,
+    /// Admin Codex skills (`/etc/codex/skills`) when present.
+    pub codex_admin_skills: PathBuf,
 }
 
 fn expand_tilde(s: &str, home: &Path) -> PathBuf {
@@ -111,6 +127,10 @@ pub fn cursor_managed_hooks_default() -> PathBuf {
     }
 }
 
+pub fn codex_admin_skills_default() -> PathBuf {
+    PathBuf::from("/etc/codex/skills")
+}
+
 impl Paths {
     pub fn resolve() -> Self {
         let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"));
@@ -127,6 +147,14 @@ impl Paths {
             None => (home.join(".claude"), home.join(".claude.json")),
         };
         let cursor_dir = home.join(".cursor");
+        let codex_env = std::env::var("CODEX_HOME")
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+        let codex_dir = match codex_env {
+            Some(d) => expand_tilde(&d, &home),
+            None => home.join(".codex"),
+        };
         Self {
             home,
             config_dir,
@@ -136,6 +164,8 @@ impl Paths {
             cursor_hooks_json: cursor_dir.join("hooks.json"),
             cursor_dir,
             cursor_managed_hooks: cursor_managed_hooks_default(),
+            codex_dir,
+            codex_admin_skills: codex_admin_skills_default(),
         }
     }
 
@@ -151,6 +181,8 @@ impl Paths {
             cursor_hooks_json: cursor_dir.join("hooks.json"),
             cursor_dir,
             cursor_managed_hooks: root.join("managed-cursor").join("hooks.json"),
+            codex_dir: root.join(".codex"),
+            codex_admin_skills: root.join("etc-codex").join("skills"),
         }
     }
 
@@ -197,6 +229,22 @@ impl Paths {
                 return Some(PathProduct::Cursor);
             }
         }
+        let codex = Self::canon_of(&self.codex_dir);
+        if path.starts_with(&codex) {
+            return Some(PathProduct::Codex);
+        }
+        let admin_skills = Self::canon_of(&self.codex_admin_skills);
+        if path.starts_with(&admin_skills) {
+            return Some(PathProduct::Codex);
+        }
+        // User shared skills: `~/.agents/skills`
+        let agents_home = Self::canon_of(&self.home.join(".agents"));
+        if let Ok(rel) = path.strip_prefix(&agents_home) {
+            let comps = Self::normal_components(rel);
+            if comps.first().map(|s| s.as_str()) == Some("skills") {
+                return Some(PathProduct::Shared);
+            }
+        }
         for root in project_roots {
             let root = Self::canon_of(root);
             if let Ok(rel) = path.strip_prefix(&root) {
@@ -212,6 +260,9 @@ impl Paths {
                 if first == Some(".cursor") {
                     return Some(PathProduct::Cursor);
                 }
+                if first == Some(".codex") {
+                    return Some(PathProduct::Codex);
+                }
                 if first == Some(".agents") && comps.get(1).map(|s| s.as_str()) == Some("skills") {
                     return Some(PathProduct::Shared);
                 }
@@ -219,7 +270,7 @@ impl Paths {
                     if matches!(name.as_str(), "CLAUDE.md" | "CLAUDE.local.md" | ".mcp.json") {
                         return Some(PathProduct::Claude);
                     }
-                    if name == "AGENTS.md" {
+                    if matches!(name.as_str(), "AGENTS.md" | "AGENTS.override.md") {
                         return Some(PathProduct::Shared);
                     }
                 }
@@ -241,11 +292,12 @@ impl Paths {
             Some(PathProduct::Cursor) if !filter.cursor => Err(AppError::AccessDenied(
                 "отслеживание Cursor выключено".into(),
             )),
-            Some(PathProduct::Shared) if !filter.claude && !filter.cursor => {
-                Err(AppError::AccessDenied(
-                    "отслеживание AI-инструментов выключено".into(),
-                ))
-            }
+            Some(PathProduct::Codex) if !filter.codex => Err(AppError::AccessDenied(
+                "отслеживание Codex выключено".into(),
+            )),
+            Some(PathProduct::Shared) if !filter.allows_shared() => Err(AppError::AccessDenied(
+                "отслеживание AI-инструментов выключено".into(),
+            )),
             _ => Ok(()),
         }
     }
@@ -254,7 +306,7 @@ impl Paths {
     fn assert_in_read_allowlist(&self, path: &Path, project_roots: &[PathBuf]) -> AppResult<()> {
         if path
             .file_name()
-            .map(|n| n == ".credentials.json")
+            .map(|n| n == ".credentials.json" || n == "auth.json")
             .unwrap_or(false)
         {
             return Err(AppError::AccessDenied("credentials are never displayed".into()));
@@ -296,6 +348,33 @@ impl Paths {
             )));
         }
 
+        let codex = Self::canon_of(&self.codex_dir);
+        if let Ok(rel) = path.strip_prefix(&codex) {
+            let comps = Self::normal_components(rel);
+            if let Some(first) = comps.first() {
+                if CODEX_DIR_ALLOWED.contains(&first.as_str()) {
+                    return Ok(());
+                }
+            }
+            return Err(AppError::AccessDenied(format!(
+                "{} is not a known Codex config file",
+                path.display()
+            )));
+        }
+
+        let admin_skills = Self::canon_of(&self.codex_admin_skills);
+        if path.starts_with(&admin_skills) {
+            return Ok(());
+        }
+
+        let agents_home = Self::canon_of(&self.home.join(".agents"));
+        if let Ok(rel) = path.strip_prefix(&agents_home) {
+            let comps = Self::normal_components(rel);
+            if comps.first().map(|s| s.as_str()) == Some("skills") {
+                return Ok(());
+            }
+        }
+
         let managed = Self::canon_of(&self.managed_dir);
         if path.starts_with(&managed) {
             return Ok(());
@@ -329,10 +408,12 @@ impl Paths {
                     .unwrap_or_default();
                 let under_claude = first == Some(".claude");
                 let under_cursor = first == Some(".cursor");
+                let under_codex = first == Some(".codex");
                 let under_agents_skills =
                     first == Some(".agents") && comps.get(1).map(|s| s.as_str()) == Some("skills");
                 if under_claude
                     || under_cursor
+                    || under_codex
                     || under_agents_skills
                     || PROJECT_FILE_NAMES.contains(&name.as_str())
                 {
@@ -341,7 +422,7 @@ impl Paths {
             }
         }
         Err(AppError::AccessDenied(format!(
-            "{} is outside known Claude Code / Cursor locations",
+            "{} is outside known Claude Code / Cursor / Codex locations",
             path.display()
         )))
     }
@@ -350,7 +431,7 @@ impl Paths {
     fn assert_writable_extras(&self, path: &Path) -> AppResult<()> {
         if path
             .file_name()
-            .map(|n| n == ".credentials.json")
+            .map(|n| n == ".credentials.json" || n == "auth.json")
             .unwrap_or(false)
         {
             return Err(AppError::AccessDenied("credentials are never written".into()));
@@ -620,6 +701,7 @@ mod tests {
         let no_claude = ToolingFilter {
             claude: false,
             cursor: true,
+            codex: true,
         };
         assert!(paths
             .check_readable(&paths.config_dir.join("settings.json"), &roots, &no_claude)
@@ -634,6 +716,7 @@ mod tests {
         let no_cursor = ToolingFilter {
             claude: true,
             cursor: false,
+            codex: true,
         };
         assert!(paths
             .check_writable(&paths.cursor_dir.join("mcp.json"), &roots, &no_cursor)
@@ -644,6 +727,153 @@ mod tests {
         assert!(paths
             .check_writable(&paths.config_dir.join("settings.json"), &roots, &no_cursor)
             .is_ok());
+    }
+
+    #[test]
+    fn allowlist_codex_files() {
+        let dir = tempdir().unwrap();
+        let paths = Paths::for_root(dir.path());
+        let cx = &paths.codex_dir;
+        fs::create_dir_all(cx.join("skills/s")).unwrap();
+        fs::create_dir_all(cx.join("hooks")).unwrap();
+        fs::create_dir_all(cx.join("sessions")).unwrap();
+        fs::create_dir_all(paths.codex_admin_skills.join("adm")).unwrap();
+        fs::create_dir_all(paths.home.join(".agents/skills/u")).unwrap();
+        fs::write(cx.join("config.toml"), "model = \"x\"").unwrap();
+        fs::write(cx.join("AGENTS.md"), "x").unwrap();
+        fs::write(cx.join("AGENTS.override.md"), "x").unwrap();
+        fs::write(cx.join("hooks.json"), "{}").unwrap();
+        fs::write(cx.join("hooks/pre.sh"), "echo").unwrap();
+        fs::write(cx.join("skills/s/SKILL.md"), "x").unwrap();
+        fs::write(cx.join("auth.json"), "secret").unwrap();
+        fs::write(cx.join("sessions/a.jsonl"), "x").unwrap();
+        fs::write(cx.join("history.jsonl"), "x").unwrap();
+        fs::write(paths.codex_admin_skills.join("adm/SKILL.md"), "x").unwrap();
+        fs::write(paths.home.join(".agents/skills/u/SKILL.md"), "x").unwrap();
+
+        let proj = dir.path().join("proj");
+        fs::create_dir_all(proj.join(".codex/skills/p")).unwrap();
+        fs::write(proj.join(".codex/config.toml"), "x").unwrap();
+        fs::write(proj.join(".codex/hooks.json"), "{}").unwrap();
+        fs::write(proj.join(".codex/skills/p/SKILL.md"), "x").unwrap();
+        fs::write(proj.join(".codex/auth.json"), "secret").unwrap();
+        fs::write(proj.join("AGENTS.override.md"), "x").unwrap();
+        fs::write(proj.join(".env"), "SECRET=1").unwrap();
+        let roots = vec![proj.clone()];
+        let f = all();
+
+        for ok in [
+            cx.join("config.toml"),
+            cx.join("AGENTS.md"),
+            cx.join("AGENTS.override.md"),
+            cx.join("hooks.json"),
+            cx.join("hooks/pre.sh"),
+            cx.join("skills/s/SKILL.md"),
+            paths.codex_admin_skills.join("adm/SKILL.md"),
+            paths.home.join(".agents/skills/u/SKILL.md"),
+            proj.join(".codex/config.toml"),
+            proj.join(".codex/hooks.json"),
+            proj.join(".codex/skills/p/SKILL.md"),
+            proj.join("AGENTS.override.md"),
+        ] {
+            assert!(paths.check_readable(&ok, &roots, &f).is_ok(), "{}", ok.display());
+        }
+        for denied in [
+            cx.join("auth.json"),
+            cx.join("sessions/a.jsonl"),
+            cx.join("history.jsonl"),
+            proj.join(".codex/auth.json"),
+            proj.join(".env"),
+        ] {
+            assert!(paths.check_readable(&denied, &roots, &f).is_err(), "{}", denied.display());
+        }
+        let err = paths.check_readable(&cx.join("auth.json"), &roots, &f).unwrap_err();
+        assert!(err.to_string().contains("credentials are never displayed"));
+        let err = paths.check_readable(&cx.join("history.jsonl"), &roots, &f).unwrap_err();
+        assert!(err.to_string().contains("not a known Codex config file"));
+
+        // Writable subset: config yes, auth never.
+        assert!(paths.check_writable(&cx.join("config.toml"), &roots, &f).is_ok());
+        assert!(paths.check_writable(&cx.join("hooks.json"), &roots, &f).is_ok());
+        assert!(paths.check_writable(&proj.join(".codex/config.toml"), &roots, &f).is_ok());
+        assert!(paths.check_writable(&cx.join("auth.json"), &roots, &f).is_err());
+    }
+
+    #[test]
+    fn disabled_codex_blocks_codex_paths_only() {
+        let dir = tempdir().unwrap();
+        let paths = Paths::for_root(dir.path());
+        fs::create_dir_all(paths.codex_dir.join("skills/s")).unwrap();
+        fs::create_dir_all(paths.home.join(".agents/skills/u")).unwrap();
+        fs::write(paths.codex_dir.join("config.toml"), "x").unwrap();
+        fs::write(paths.codex_dir.join("skills/s/SKILL.md"), "x").unwrap();
+        fs::write(paths.home.join(".agents/skills/u/SKILL.md"), "x").unwrap();
+        fs::create_dir_all(paths.cursor_dir.join("rules")).unwrap();
+        fs::write(paths.cursor_dir.join("mcp.json"), "{}").unwrap();
+        let proj = dir.path().join("proj");
+        fs::create_dir_all(proj.join(".codex")).unwrap();
+        fs::write(proj.join(".codex/config.toml"), "x").unwrap();
+        fs::write(proj.join("AGENTS.md"), "x").unwrap();
+        let roots = vec![proj.clone()];
+
+        let no_codex = ToolingFilter { claude: true, cursor: true, codex: false };
+        let err = paths
+            .check_readable(&paths.codex_dir.join("config.toml"), &roots, &no_codex)
+            .unwrap_err();
+        assert!(err.to_string().contains("Codex"));
+        assert!(paths.check_readable(&paths.codex_dir.join("skills/s/SKILL.md"), &roots, &no_codex).is_err());
+        assert!(paths.check_readable(&proj.join(".codex/config.toml"), &roots, &no_codex).is_err());
+        assert!(paths
+            .check_writable(&paths.codex_dir.join("config.toml"), &roots, &no_codex)
+            .is_err());
+        assert!(paths
+            .check_writable_destination(&paths.codex_dir, "new.toml", &roots, &no_codex)
+            .is_err());
+        // Shared + other products unaffected.
+        assert!(paths.check_readable(&proj.join("AGENTS.md"), &roots, &no_codex).is_ok());
+        assert!(paths.check_readable(&paths.home.join(".agents/skills/u/SKILL.md"), &roots, &no_codex).is_ok());
+        assert!(paths.check_readable(&paths.cursor_dir.join("mcp.json"), &roots, &no_codex).is_ok());
+
+        // Other products disabled must not block Codex.
+        let only_codex = ToolingFilter { claude: false, cursor: false, codex: true };
+        assert!(paths.check_readable(&paths.codex_dir.join("config.toml"), &roots, &only_codex).is_ok());
+        assert!(paths.check_readable(&paths.cursor_dir.join("mcp.json"), &roots, &only_codex).is_err());
+    }
+
+    #[test]
+    fn shared_allowed_when_only_codex_tracked() {
+        let dir = tempdir().unwrap();
+        let paths = Paths::for_root(dir.path());
+        fs::create_dir_all(paths.home.join(".agents/skills/u")).unwrap();
+        fs::write(paths.home.join(".agents/skills/u/SKILL.md"), "x").unwrap();
+        let proj = dir.path().join("proj");
+        fs::create_dir_all(proj.join(".agents/skills/p")).unwrap();
+        fs::write(proj.join(".agents/skills/p/SKILL.md"), "x").unwrap();
+        fs::write(proj.join("AGENTS.md"), "x").unwrap();
+        fs::write(proj.join("AGENTS.override.md"), "x").unwrap();
+        fs::write(proj.join("CLAUDE.md"), "x").unwrap();
+        let roots = vec![proj.clone()];
+
+        let codex_only = ToolingFilter { claude: false, cursor: false, codex: true };
+        assert!(codex_only.allows_shared());
+        for p in [
+            paths.home.join(".agents/skills/u/SKILL.md"),
+            proj.join(".agents/skills/p/SKILL.md"),
+            proj.join("AGENTS.md"),
+            proj.join("AGENTS.override.md"),
+        ] {
+            assert!(paths.check_readable(&p, &roots, &codex_only).is_ok(), "{}", p.display());
+        }
+        // Claude-owned file stays gated.
+        assert!(paths.check_readable(&proj.join("CLAUDE.md"), &roots, &codex_only).is_err());
+    }
+
+    #[test]
+    fn for_root_isolates_codex_paths() {
+        let dir = tempdir().unwrap();
+        let paths = Paths::for_root(dir.path());
+        assert_eq!(paths.codex_dir, dir.path().join(".codex"));
+        assert_eq!(paths.codex_admin_skills, dir.path().join("etc-codex/skills"));
     }
 
     #[test]

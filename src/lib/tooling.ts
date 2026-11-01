@@ -1,16 +1,33 @@
 import { tr } from "@/i18n";
-import type { Preferences, Product } from "@/types/config";
+import type { Preferences, Product, ProjectInfo } from "@/types/config";
 import { PRODUCT_DIR_LABEL } from "./labels";
 
+/**
+ * Registry of AI tooling products. Add a provider here + backend `Tooling` /
+ * `track*` pref + scanner — avoid per-product copy-paste in views.
+ * Future stubs (no full scanner): windsurf, continue, gemini-cli.
+ */
 export const TOOLING_PROVIDERS = [
   { id: "claude" as const, label: "Claude Code", prefKey: "trackClaude" as const },
   { id: "cursor" as const, label: "Cursor", prefKey: "trackCursor" as const },
+  { id: "codex" as const, label: "Codex", prefKey: "trackCodex" as const },
 ] as const;
 
 export type ToolingProviderId = (typeof TOOLING_PROVIDERS)[number]["id"];
+export type ToolingPrefKey = (typeof TOOLING_PROVIDERS)[number]["prefKey"];
+
+export function prefKeyForProduct(product: Product): ToolingPrefKey | undefined {
+  return TOOLING_PROVIDERS.find((p) => p.id === product)?.prefKey;
+}
 
 export function isProductTracked(prefs: Preferences, product: Product): boolean {
-  return product === "cursor" ? prefs.trackCursor : prefs.trackClaude;
+  const key = prefKeyForProduct(product);
+  return key ? prefs[key] : false;
+}
+
+/** True when at least one registered product is enabled. */
+export function hasTrackedProduct(prefs: Preferences): boolean {
+  return TOOLING_PROVIDERS.some((p) => prefs[p.prefKey]);
 }
 
 export function trackedProviders(prefs: Preferences) {
@@ -41,4 +58,28 @@ export function trackedPathHint(prefs: Preferences, segment: string): string {
   if (parts.length === 0) return segment;
   if (parts.length === 1) return parts[0]!;
   return parts.join(` ${tr("common.and")} `);
+}
+
+/** Project has a product's config directory (`.claude`, `.cursor`, `.codex`). */
+export function projectHasProductDir(p: ProjectInfo, product: Product): boolean {
+  switch (product) {
+    case "cursor":
+      return !!p.hasCursorDir;
+    case "codex":
+      return !!p.hasCodexDir;
+    default:
+      return !!p.hasClaudeDir;
+  }
+}
+
+/** Project has any marker file/dir for the product (dir, CLAUDE.md, MCP json). */
+export function projectHasProduct(p: ProjectInfo, product: Product): boolean {
+  switch (product) {
+    case "cursor":
+      return p.hasCursorDir || p.hasCursorMcpJson;
+    case "codex":
+      return !!p.hasCodexDir;
+    default:
+      return p.hasClaudeDir || p.hasClaudeMd || p.hasMcpJson;
+  }
 }

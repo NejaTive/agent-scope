@@ -1,5 +1,6 @@
-//! Read-only scanner for global and per-project Claude Code / Cursor configuration.
+//! Read-only scanner for global and per-project Claude Code / Cursor / Codex configuration.
 
+pub mod codex;
 pub mod collect;
 pub mod cursor;
 pub mod discovery;
@@ -155,11 +156,17 @@ pub fn scan_global_with(ctx: &ScanContext, filter: &ToolingFilter) -> GlobalBund
         cursor::collect_cursor_user(&mut c, paths);
     }
 
+    // User scope (Codex) — after Claude/Cursor so shared paths keep their first owner.
+    if filter.codex {
+        codex::collect_codex_user(&mut c, paths);
+    }
+
     GlobalBundle {
         config_dir: path_str(&paths.config_dir),
         managed_dir: path_str(&paths.managed_dir),
         claude_json_path: path_str(&paths.claude_json),
         cursor_config_dir: Some(path_str(&paths.cursor_dir)),
+        codex_config_dir: Some(path_str(&paths.codex_dir)),
         credentials_present,
         items: c,
     }
@@ -210,6 +217,11 @@ pub fn scan_project_with(ctx: &ScanContext, root: &Path, filter: &ToolingFilter)
     // Cursor project paths — skip anything Claude already collected (one path = one artifact).
     if filter.cursor {
         cursor::collect_cursor_project(&mut c, &root, p);
+    }
+
+    // Codex project paths — skip anything Claude / Cursor already collected.
+    if filter.codex {
+        codex::collect_codex_project(&mut c, &root, p);
     }
 
     let mut info = discovery::info_for_dir(&root);

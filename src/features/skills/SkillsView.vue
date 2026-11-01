@@ -5,8 +5,7 @@ import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import { useUiStore } from "@/stores/ui";
 import type { BrowserItem } from "@/lib/browser";
-import { PRODUCT_DIR_LABEL } from "@/lib/labels";
-import { trackedProviders } from "@/lib/tooling";
+import { trackedPathHint } from "@/lib/tooling";
 import type { SkillEntry, UiSkill } from "@/types/config";
 import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
 import FieldList from "@/components/common/FieldList.vue";
@@ -59,16 +58,8 @@ const items = computed<BrowserItem[]>(() =>
   })),
 );
 
-function joinAnd(parts: string[]): string {
-  if (parts.length === 0) return "";
-  if (parts.length === 1) return parts[0]!;
-  return `${parts.slice(0, -1).join(", ")} ${t("common.and")} ${parts[parts.length - 1]}`;
-}
-
 const emptyDescription = computed(() => {
-  const skills = joinAnd(
-    trackedProviders(prefs.prefs).map((p) => `${PRODUCT_DIR_LABEL[p.id]}/skills/<name>/SKILL.md`),
-  ) || "skills/<name>/SKILL.md";
+  const skills = trackedPathHint(prefs.prefs, "skills/<name>/SKILL.md");
   const cmd = prefs.prefs.trackClaude ? t("skills.emptyCommandsSuffix") : "";
   return t("skills.emptyHint", { skills, commands: cmd });
 });

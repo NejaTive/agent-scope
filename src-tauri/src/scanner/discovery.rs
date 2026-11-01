@@ -25,14 +25,19 @@ pub fn probe_project(dir: &Path, filter: &ToolingFilter) -> Option<ProjectInfo> 
     let has_mcp_json = dir.join(".mcp.json").is_file();
     let has_cursor_dir = dir.join(".cursor").is_dir();
     let has_cursor_mcp_json = dir.join(".cursor/mcp.json").is_file();
+    let has_codex_dir = dir.join(".codex").is_dir();
 
     // Claude-ish discovery markers: .claude, CLAUDE.md, .mcp.json
     let claude_marker = has_claude_dir || has_claude_md || has_mcp_json;
     // Cursor discovery markers: .cursor / .cursor/mcp.json
     let cursor_marker = has_cursor_dir || has_cursor_mcp_json;
 
-    let enabled_marker =
-        (filter.claude && claude_marker) || (filter.cursor && cursor_marker);
+    // Codex discovery marker: `.codex` only (bare AGENTS.md never discovers a project).
+    let codex_marker = has_codex_dir;
+
+    let enabled_marker = (filter.claude && claude_marker)
+        || (filter.cursor && cursor_marker)
+        || (filter.codex && codex_marker);
     if !enabled_marker {
         return None;
     }
@@ -43,6 +48,7 @@ pub fn probe_project(dir: &Path, filter: &ToolingFilter) -> Option<ProjectInfo> 
         has_mcp_json,
         has_cursor_dir,
         has_cursor_mcp_json,
+        has_codex_dir,
     ))
 }
 
@@ -53,6 +59,7 @@ pub fn project_info(
     has_mcp_json: bool,
     has_cursor_dir: bool,
     has_cursor_mcp_json: bool,
+    has_codex_dir: bool,
 ) -> ProjectInfo {
     ProjectInfo {
         path: dir.to_string_lossy().to_string(),
@@ -65,6 +72,7 @@ pub fn project_info(
         has_mcp_json,
         has_cursor_dir,
         has_cursor_mcp_json,
+        has_codex_dir,
         pinned: false,
         discovered: true,
         artifact_count: 0,
@@ -80,6 +88,7 @@ pub fn info_for_dir(dir: &Path) -> ProjectInfo {
         dir.join(".mcp.json").is_file(),
         dir.join(".cursor").is_dir(),
         dir.join(".cursor/mcp.json").is_file(),
+        dir.join(".codex").is_dir(),
     )
 }
 
@@ -230,6 +239,7 @@ mod tests {
         let claude_only = ToolingFilter {
             claude: true,
             cursor: false,
+            codex: false,
         };
         let names: Vec<_> = discover_projects(&[r.to_path_buf()], 3, &claude_only)
             .iter()
@@ -240,6 +250,7 @@ mod tests {
         let cursor_only = ToolingFilter {
             claude: false,
             cursor: true,
+            codex: false,
         };
         let names: Vec<_> = discover_projects(&[r.to_path_buf()], 3, &cursor_only)
             .iter()
@@ -303,5 +314,32 @@ mod tests {
         );
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].name, "p");
+    }
+
+    #[test]
+    fn discovers_codex_only_project() {
+        let d = tempdir().unwrap();
+        let r = d.path();
+        mk(&r.join("codex-app/.codex"));
+        mk(&r.join("agents-only"));
+        fs::write(r.join("agents-only/AGENTS.md"), "x").unwrap();
+        fs::write(r.join("agents-only/AGENTS.override.md"), "x").unwrap();
+
+        let found = discover_projects(&[r.to_path_buf()], 3, &all());
+        let names: Vec<_> = found.iter().map(|p| p.name.clone()).collect();
+        assert_eq!(names, vec!["codex-app"], "bare AGENTS*.md must not discover a project");
+        assert!(found[0].has_codex_dir);
+        assert!(!found[0].has_claude_dir && !found[0].has_cursor_dir);
+
+        let codex_only = ToolingFilter { claude: false, cursor: false, codex: true };
+        assert_eq!(discover_projects(&[r.to_path_buf()], 3, &codex_only).len(), 1);
+
+        // Codex off: `.codex` alone does not discover; `has_codex_dir` stays truthful.
+        let no_codex = ToolingFilter { claude: true, cursor: true, codex: false };
+        assert!(discover_projects(&[r.to_path_buf()], 3, &no_codex).is_empty());
+        mk(&r.join("codex-app/.claude"));
+        let both = probe_project(&r.join("codex-app"), &no_codex).unwrap();
+        assert!(both.has_codex_dir && both.has_claude_dir);
+        assert!(info_for_dir(&r.join("codex-app")).has_codex_dir);
     }
 }

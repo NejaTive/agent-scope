@@ -10,19 +10,22 @@ import type {
 export const PRODUCT_LABEL: Record<Product, string> = {
   claude: "Claude Code",
   cursor: "Cursor",
+  codex: "Codex",
 };
 
-export const PRODUCT_ORDER: Product[] = ["claude", "cursor"];
+export const PRODUCT_ORDER: Product[] = ["claude", "cursor", "codex"];
 
 /** Dir badge text (filesystem names, not translated). */
 export const PRODUCT_DIR_LABEL: Record<Product, string> = {
   claude: ".claude",
   cursor: ".cursor",
+  codex: ".codex",
 };
 
 /** Missing / null product → Claude Code for backward compatibility. */
 export function resolveProduct(product?: Product | null): Product {
-  return product === "cursor" ? "cursor" : "claude";
+  if (product === "cursor" || product === "codex") return product;
+  return "claude";
 }
 
 /** Locale-aware record: each access resolves via vue-i18n. */

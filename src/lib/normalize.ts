@@ -71,6 +71,7 @@ function emptyGlobalMeta(): GlobalMeta {
     managedDir: "",
     claudeJsonPath: "",
     cursorConfigDir: null,
+    codexConfigDir: null,
     credentialsPresent: false,
   };
 }
@@ -81,6 +82,7 @@ export function normalizeProjectInfo(p: ProjectInfo): ProjectInfo {
     ...p,
     hasClaudeDir: !!p.hasClaudeDir,
     hasCursorDir: !!p.hasCursorDir,
+    hasCodexDir: !!p.hasCodexDir,
     hasClaudeMd: !!p.hasClaudeMd,
     hasMcpJson: !!p.hasMcpJson,
     hasCursorMcpJson: !!p.hasCursorMcpJson,
@@ -232,6 +234,7 @@ export function normalizeSnapshot(
       managedDir: g.managedDir ?? "",
       claudeJsonPath: g.claudeJsonPath ?? "",
       cursorConfigDir: g.cursorConfigDir ?? null,
+      codexConfigDir: g.codexConfigDir ?? null,
       credentialsPresent: !!g.credentialsPresent,
     },
   };

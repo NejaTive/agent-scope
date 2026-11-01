@@ -101,13 +101,14 @@ pub enum Confidence {
     Unknown,
 }
 
-/// Which product/tooling an artifact belongs to (Claude Code vs Cursor).
+/// Which product/tooling an artifact belongs to (Claude Code / Cursor / Codex).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub enum Tooling {
     #[default]
     Claude,
     Cursor,
+    Codex,
 }
 
 impl Tooling {
@@ -115,6 +116,7 @@ impl Tooling {
         match self {
             Tooling::Claude => "claude",
             Tooling::Cursor => "cursor",
+            Tooling::Codex => "codex",
         }
     }
 }
@@ -142,7 +144,7 @@ pub struct ConfigArtifact {
     /// File tree listing (relative paths) for directory-like artifacts such as skills.
     pub children: Vec<String>,
     pub metadata: Value,
-    /// Claude Code vs Cursor; defaults to Claude for existing collectors.
+    /// Claude Code / Cursor / Codex; defaults to Claude for existing collectors.
     #[serde(default)]
     pub product: Tooling,
 }
@@ -207,6 +209,9 @@ pub struct ProjectInfo {
     pub has_cursor_dir: bool,
     #[serde(default)]
     pub has_cursor_mcp_json: bool,
+    /// Present when the project has a `.codex` directory.
+    #[serde(default)]
+    pub has_codex_dir: bool,
     pub pinned: bool,
     pub discovered: bool,
     pub artifact_count: usize,
@@ -334,6 +339,9 @@ pub struct GlobalBundle {
     /// User Cursor config root (`~/.cursor`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cursor_config_dir: Option<String>,
+    /// User Codex config root (`CODEX_HOME` / `~/.codex`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub codex_config_dir: Option<String>,
     /// `.credentials.json` exists (contents are never read).
     pub credentials_present: bool,
     #[serde(flatten)]
@@ -563,6 +571,8 @@ pub struct Preferences {
     pub track_claude: bool,
     /// Include Cursor locations in scan / watch / allowlist. Default true.
     pub track_cursor: bool,
+    /// Include OpenAI Codex locations in scan / watch / allowlist. Default true.
+    pub track_codex: bool,
 }
 
 impl Default for Preferences {
@@ -575,6 +585,7 @@ impl Default for Preferences {
             allow_editing: false,
             track_claude: true,
             track_cursor: true,
+            track_codex: true,
         }
     }
 }
@@ -601,6 +612,7 @@ mod tests {
         assert_eq!(serde_json::to_value(DiscoveryStatus::InvalidJson).unwrap(), "invalidJson");
         assert_eq!(serde_json::to_value(Tooling::Claude).unwrap(), "claude");
         assert_eq!(serde_json::to_value(Tooling::Cursor).unwrap(), "cursor");
+        assert_eq!(serde_json::to_value(Tooling::Codex).unwrap(), "codex");
     }
 
     #[test]

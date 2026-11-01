@@ -164,10 +164,11 @@ Agent Scope is a local desktop app.
 
 ## Supported tools
 
-| Tool        | Support                         |
-| ----------- | ------------------------------- |
-| Claude Code | Global and project configs      |
-| Cursor      | Global and project configs      |
+| Tool        | Support             |
+| ----------- | ------------------- |
+| Claude Code | Global and project  |
+| Cursor      | Global and project  |
+| OpenAI Codex | Global and project |
 
 **Upgrade** to the latest version:
 
@@ -257,6 +258,7 @@ npm run tauri:build -- --target x86_64-unknown-linux-gnu --bundles appimage,deb,
 
 - [Claude Code spec](docs/spec/claude-code.md).
 - [Cursor spec](docs/spec/cursor.md).
+- [OpenAI Codex spec](docs/spec/codex.md).
 
 ## License
 

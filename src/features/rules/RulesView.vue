@@ -5,6 +5,8 @@ import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import type { BrowserItem } from "@/lib/browser";
 import { PRODUCT_DIR_LABEL } from "@/lib/labels";
+import { trackedProviders } from "@/lib/tooling";
+import type { Product } from "@/types/config";
 import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
 import FieldList from "@/components/common/FieldList.vue";
 
@@ -31,9 +33,11 @@ const items = computed<BrowserItem[]>(() =>
 );
 
 const emptyDescription = computed(() => {
-  const parts: string[] = [];
-  if (prefs.prefs.trackClaude) parts.push(`${PRODUCT_DIR_LABEL.claude}/rules/*.md`);
-  if (prefs.prefs.trackCursor) parts.push(`${PRODUCT_DIR_LABEL.cursor}/rules/*.mdc`);
+  // Rule dirs are scanned for Claude Code (*.md) and Cursor (*.mdc) only.
+  const RULE_GLOB: Partial<Record<Product, string>> = { claude: "*.md", cursor: "*.mdc" };
+  const parts = trackedProviders(prefs.prefs)
+    .filter((p) => RULE_GLOB[p.id])
+    .map((p) => `${PRODUCT_DIR_LABEL[p.id]}/rules/${RULE_GLOB[p.id]}`);
   const where =
     parts.length === 0
       ? t("rules.emptyWhereFallback")

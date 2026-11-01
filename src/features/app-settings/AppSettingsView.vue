@@ -31,7 +31,7 @@ const LOCALE_OPTIONS = computed(() =>
   })),
 );
 
-const presence = ref<ToolingPresence>({ claude: false, cursor: false });
+const presence = ref<ToolingPresence>({ claude: false, cursor: false, codex: false });
 
 async function loadPresence() {
   try {
@@ -335,6 +335,14 @@ function setLocale(locale: AppLocale) {
             <dt class="text-subtle">{{ t("settings.cursorDir") }}</dt>
             <dd class="break-all font-mono">
               {{ shortenPath(scan.globalMeta.cursorConfigDir) }}
+            </dd>
+          </template>
+          <template
+            v-if="prefs.prefs.trackCodex && scan.globalMeta.codexConfigDir"
+          >
+            <dt class="text-subtle">{{ t("settings.codexDir") }}</dt>
+            <dd class="break-all font-mono">
+              {{ shortenPath(scan.globalMeta.codexConfigDir) }}
             </dd>
           </template>
           <template v-if="scan.globalMeta.managedDir">

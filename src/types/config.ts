@@ -45,8 +45,8 @@ export type DiscoveryStatus =
   | "invalidFrontmatter"
   | "partial";
 
-/** Claude Code vs Cursor product tagging (`product` field). */
-export type Tooling = "claude" | "cursor";
+/** Claude Code / Cursor / Codex product tagging (`product` field). */
+export type Tooling = "claude" | "cursor" | "codex";
 /** @deprecated Prefer `Tooling`. */
 export type Product = Tooling;
 
@@ -94,6 +94,8 @@ export interface ProjectInfo {
   hasCursorDir: boolean;
   /** Present when the project has `.cursor/mcp.json`. */
   hasCursorMcpJson: boolean;
+  /** Present when the project has a `.codex` directory. */
+  hasCodexDir?: boolean;
   pinned: boolean;
   discovered: boolean;
   artifactCount: number;
@@ -203,6 +205,8 @@ export interface GlobalBundle extends Collection {
   claudeJsonPath: string;
   /** User Cursor config root (`~/.cursor`), when known. */
   cursorConfigDir?: string | null;
+  /** User Codex config root (`CODEX_HOME` / `~/.codex`), when known. */
+  codexConfigDir?: string | null;
   credentialsPresent: boolean;
 }
 
@@ -344,12 +348,15 @@ export interface Preferences {
   trackClaude: boolean;
   /** Include Cursor trees in scan/watch. Default true. */
   trackCursor: boolean;
+  /** Include OpenAI Codex trees in scan/watch. Default true. */
+  trackCodex: boolean;
 }
 
 /** Disk presence of known AI tooling config roots (`get_tooling_presence`). */
 export interface ToolingPresence {
   claude: boolean;
   cursor: boolean;
+  codex: boolean;
 }
 
 export type AppPreferences = Preferences;
@@ -400,6 +407,8 @@ export interface GlobalMeta {
   claudeJsonPath: string;
   /** User Cursor config root (`~/.cursor`), when known. */
   cursorConfigDir?: string | null;
+  /** User Codex config root (`CODEX_HOME` / `~/.codex`), when known. */
+  codexConfigDir?: string | null;
   credentialsPresent: boolean;
 }
 

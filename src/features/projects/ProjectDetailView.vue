@@ -9,7 +9,7 @@ import { useUiStore } from "@/stores/ui";
 import { artifactToItem, type BrowserItem } from "@/lib/browser";
 import { shortenPath } from "@/lib/format";
 import { PRODUCT_DIR_LABEL, resolveProduct } from "@/lib/labels";
-import { isProductTracked, trackedProviders } from "@/lib/tooling";
+import { isProductTracked, projectHasProduct, trackedProviders } from "@/lib/tooling";
 import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
 import ProductBadge from "@/components/common/ProductBadge.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
@@ -107,18 +107,11 @@ const emptyInventoryDescription = computed(() => {
         <div class="flex items-center gap-2">
           <span class="truncate text-[13px] font-semibold">{{ project.name }}</span>
           <ProductBadge
-            v-if="
-              prefs.prefs.trackClaude &&
-              (project.hasClaudeDir || project.hasClaudeMd || project.hasMcpJson)
-            "
-            product="claude"
-          />
-          <ProductBadge
-            v-if="
-              prefs.prefs.trackCursor &&
-              (project.hasCursorDir || project.hasCursorMcpJson)
-            "
-            product="cursor"
+            v-for="prov in trackedProviders(prefs.prefs).filter((x) =>
+              projectHasProduct(project!, x.id),
+            )"
+            :key="prov.id"
+            :product="prov.id"
           />
         </div>
         <div class="truncate font-mono text-2xs text-subtle" :title="project.path">

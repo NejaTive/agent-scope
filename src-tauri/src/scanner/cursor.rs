@@ -17,11 +17,11 @@ const MAX_SKILL_DEPTH: usize = 8;
 const MAX_FILES_PER_DIR: usize = 500;
 const MAX_TREE_ENTRIES: usize = 200;
 
-fn file_name(p: &Path) -> String {
+pub(super) fn file_name(p: &Path) -> String {
     p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()
 }
 
-fn read_text(path: &Path) -> Result<String, (DiscoveryStatus, String)> {
+pub(super) fn read_text(path: &Path) -> Result<String, (DiscoveryStatus, String)> {
     let bytes = fs::read(path).map_err(|e| (DiscoveryStatus::Unreadable, e.to_string()))?;
     String::from_utf8(bytes)
         .map_err(|_| (DiscoveryStatus::Unreadable, "file is not valid UTF-8".to_string()))
@@ -58,11 +58,11 @@ fn mark_cursor(a: &mut ConfigArtifact) {
     a.product = Tooling::Cursor;
 }
 
-fn already_seen(seen: &HashSet<String>, path: &Path) -> bool {
+pub(super) fn already_seen(seen: &HashSet<String>, path: &Path) -> bool {
     seen.contains(&path_str(path))
 }
 
-fn remember(seen: &mut HashSet<String>, path: &Path) {
+pub(super) fn remember(seen: &mut HashSet<String>, path: &Path) {
     seen.insert(path_str(path));
 }
 
@@ -206,6 +206,18 @@ pub fn collect_cursor_skills(
     project: Option<&str>,
     seen: &mut HashSet<String>,
 ) {
+    collect_skills_for(c, dir, scope, project, seen, Tooling::Cursor);
+}
+
+/// Shared skill walker; `product` tags every collected artifact (Cursor / Codex).
+pub(super) fn collect_skills_for(
+    c: &mut Collection,
+    dir: &Path,
+    scope: Scope,
+    project: Option<&str>,
+    seen: &mut HashSet<String>,
+    product: Tooling,
+) {
     if !dir.is_dir() {
         return;
     }
@@ -230,7 +242,7 @@ pub fn collect_cursor_skills(
         let dir_name = file_name(skill_dir);
         let files = tree_listing(skill_dir);
         let mut a = artifact(ArtifactKind::Skill, scope, &dir_name, &skill_md, project);
-        mark_cursor(&mut a);
+        a.product = product;
         a.children = files.clone();
         let mut entry = SkillEntry {
             name: dir_name.clone(),
@@ -443,7 +455,7 @@ fn collect_cursor_mcp(
     }
 }
 
-fn seed_seen(c: &Collection) -> HashSet<String> {
+pub(super) fn seed_seen(c: &Collection) -> HashSet<String> {
     let mut seen: HashSet<String> = c.artifacts.iter().map(|a| a.path.clone()).collect();
     for s in &c.skills {
         seen.insert(s.path.clone());

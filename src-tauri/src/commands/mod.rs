@@ -504,8 +504,9 @@ pub fn set_preferences(prefs: Preferences, state: State<'_, AppState>) -> Result
     let track_changed = {
         let db = state.db.lock();
         let old = db.get_preferences()?;
-        let changed =
-            old.track_claude != prefs.track_claude || old.track_cursor != prefs.track_cursor;
+        let changed = old.track_claude != prefs.track_claude
+            || old.track_cursor != prefs.track_cursor
+            || old.track_codex != prefs.track_codex;
         db.set_preferences(&prefs)?;
         let got = db.get_preferences()?;
         (changed, got)
@@ -516,7 +517,7 @@ pub fn set_preferences(prefs: Preferences, state: State<'_, AppState>) -> Result
     Ok(track_changed.1)
 }
 
-/// Whether typical Claude / Cursor config roots exist on disk (for UI hints).
+/// Whether typical Claude / Cursor / Codex config roots exist on disk (for UI hints).
 #[tauri::command]
 pub fn get_tooling_presence(state: State<'_, AppState>) -> ToolingPresence {
     ToolingPresence::probe(&state.paths)
@@ -614,9 +615,10 @@ mod tests {
     #[test]
     fn set_preferences_rejects_both_track_off() {
         let mut bad = Preferences::default();
-        assert!(bad.track_claude && bad.track_cursor);
+        assert!(bad.track_claude && bad.track_cursor && bad.track_codex);
         bad.track_claude = false;
         bad.track_cursor = false;
+        bad.track_codex = false;
         let err = ToolingFilter::validate_prefs(&bad).unwrap_err();
         assert!(err.to_string().contains("хотя бы один"));
     }
@@ -633,8 +635,9 @@ mod tests {
         let track_changed = {
             let db = st.db.lock();
             let old = db.get_preferences().unwrap();
-            let changed =
-                old.track_claude != prefs.track_claude || old.track_cursor != prefs.track_cursor;
+            let changed = old.track_claude != prefs.track_claude
+                || old.track_cursor != prefs.track_cursor
+                || old.track_codex != prefs.track_codex;
             db.set_preferences(&prefs).unwrap();
             changed
         };
@@ -642,7 +645,7 @@ mod tests {
         st.invalidate();
         assert!(st.snapshot.lock().is_none());
         let got = st.db.lock().get_preferences().unwrap();
-        assert!(got.track_claude && !got.track_cursor);
+        assert!(got.track_claude && !got.track_cursor && got.track_codex);
     }
 
     #[test]

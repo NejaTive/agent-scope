@@ -64,6 +64,7 @@ export default {
     version: "Version",
     claudeDir: "Claude Code directory",
     cursorDir: "Cursor directory",
+    codexDir: "Codex directory",
     managedDir: "Managed directory",
     backend: "Backend",
     backendConnected: "connected",
@@ -351,7 +352,7 @@ export default {
   hooks: {
     emptyTitle: "No hooks configured",
     emptyHint:
-      "Hooks are declared in settings.json (user, project, or local) and in plugins.",
+      "Hooks are declared in settings.json (user, project, or local), Codex hooks.json, and in plugins.",
     sourceFile: "Source file",
     hook: "Hook",
     event: "Event",

@@ -6,10 +6,11 @@ import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import { useUiStore } from "@/stores/ui";
 import { formatTime, relativeTime, shortenPath } from "@/lib/format";
-import { PRODUCT_LABEL, resolveProduct } from "@/lib/labels";
+import { resolveProduct } from "@/lib/labels";
 import { pluralCountLocale } from "@/lib/plural";
-import { isProductTracked } from "@/lib/tooling";
+import { isProductTracked, projectHasProductDir, trackedProviders } from "@/lib/tooling";
 import Badge from "@/components/common/Badge.vue";
+import ProductBadge from "@/components/common/ProductBadge.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import ScopeBadge from "@/components/common/ScopeBadge.vue";
 
@@ -22,21 +23,18 @@ const router = useRouter();
 onMounted(() => ui.markChangesSeen());
 
 const productStats = computed(() => {
-  let claude = 0;
-  let cursor = 0;
+  const counts: Record<string, number> = {};
   for (const a of scan.artifacts) {
     const product = resolveProduct(a.product);
     if (!isProductTracked(prefs.prefs, product)) continue;
-    if (product === "cursor") cursor += 1;
-    else claude += 1;
+    counts[product] = (counts[product] ?? 0) + 1;
   }
-  const withClaude = scan.projects.filter((p) => p.hasClaudeDir).length;
-  const withCursor = scan.projects.filter((p) => p.hasCursorDir).length;
-  return { claude, cursor, withClaude, withCursor };
+  return trackedProviders(prefs.prefs).map((prov) => ({
+    id: prov.id,
+    artifacts: counts[prov.id] ?? 0,
+    projects: scan.projects.filter((p) => projectHasProductDir(p, prov.id)).length,
+  }));
 });
-
-const showClaude = computed(() => prefs.prefs.trackClaude);
-const showCursor = computed(() => prefs.prefs.trackCursor);
 
 const cards = computed(() => {
   const d = scan.dashboard;
@@ -76,22 +74,15 @@ const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
   <div class="h-full overflow-y-auto">
     <div class="mx-auto max-w-5xl space-y-6 px-6 py-5">
       <section
-        v-if="showClaude || showCursor"
+        v-if="productStats.length"
         class="flex flex-wrap items-center gap-2 text-xs text-muted"
       >
-        <template v-if="showClaude">
-          <Badge tone="info">{{ PRODUCT_LABEL.claude }}</Badge>
+        <template v-for="(st, i) in productStats" :key="st.id">
+          <span v-if="i > 0" class="text-subtle">·</span>
+          <ProductBadge :product="st.id" />
           <span>
-            {{ pluralCountLocale(productStats.claude, "artifact") }} ·
-            {{ pluralCountLocale(productStats.withClaude, "project") }}
-          </span>
-        </template>
-        <span v-if="showClaude && showCursor" class="text-subtle">·</span>
-        <template v-if="showCursor">
-          <Badge tone="accent">{{ PRODUCT_LABEL.cursor }}</Badge>
-          <span>
-            {{ pluralCountLocale(productStats.cursor, "artifact") }} ·
-            {{ pluralCountLocale(productStats.withCursor, "project") }}
+            {{ pluralCountLocale(st.artifacts, "artifact") }} ·
+            {{ pluralCountLocale(st.projects, "project") }}
           </span>
         </template>
       </section>

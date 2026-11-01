@@ -10,7 +10,7 @@ import { matchesQuery } from "@/composables/useSearch";
 import { shortenPath } from "@/lib/format";
 import { PRODUCT_DIR_LABEL } from "@/lib/labels";
 import { pluralCountLocale, type PluralKey } from "@/lib/plural";
-import { trackedProviders } from "@/lib/tooling";
+import { projectHasProduct, trackedProviders } from "@/lib/tooling";
 import type { ProjectInfo } from "@/types/config";
 import Badge from "@/components/common/Badge.vue";
 import ProductBadge from "@/components/common/ProductBadge.vue";
@@ -18,13 +18,6 @@ import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import Icon from "@/components/common/Icon.vue";
 import LoadingBlock from "@/components/common/LoadingBlock.vue";
-
-function hasClaude(p: ProjectInfo) {
-  return p.hasClaudeDir || p.hasClaudeMd || p.hasMcpJson;
-}
-function hasCursor(p: ProjectInfo) {
-  return p.hasCursorDir || p.hasCursorMcpJson;
-}
 
 const { t } = useI18n();
 const scan = useScanStore();
@@ -155,8 +148,11 @@ async function confirmRemoveRoot() {
             <button type="button" class="flex min-w-0 flex-1 flex-col gap-0.5 text-left" @click="open(p)">
               <span class="flex items-center gap-2">
                 <span class="truncate text-[13px] font-medium">{{ p.name }}</span>
-                <ProductBadge v-if="prefs.prefs.trackClaude && hasClaude(p)" product="claude" />
-                <ProductBadge v-if="prefs.prefs.trackCursor && hasCursor(p)" product="cursor" />
+                <ProductBadge
+                  v-for="prov in trackedProviders(prefs.prefs).filter((x) => projectHasProduct(p, x.id))"
+                  :key="prov.id"
+                  :product="prov.id"
+                />
               </span>
               <span class="truncate font-mono text-2xs text-subtle" :title="p.path">{{ shortenPath(p.path) }}</span>
             </button>

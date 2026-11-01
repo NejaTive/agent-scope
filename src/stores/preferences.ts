@@ -4,6 +4,7 @@ import { applyLocale, detectBrowserLocale, isAppLocale } from "@/i18n";
 import { ipc } from "@/lib/ipc";
 import { errMsg } from "@/lib/normalize";
 import type { AppLocale, Preferences, ThemePreference } from "@/types/config";
+import { hasTrackedProduct } from "@/lib/tooling";
 import { useScanStore } from "./scan";
 
 const LS_KEY = "agent-scope:preferences";
@@ -16,6 +17,7 @@ const DEFAULTS: Preferences = {
   allowEditing: false,
   trackClaude: true,
   trackCursor: true,
+  trackCodex: true,
 };
 
 const THEMES: ThemePreference[] = ["dark", "light", "system"];
@@ -29,6 +31,7 @@ function sanitize(p: Partial<Preferences>): Partial<Preferences> {
   if (typeof p.allowEditing === "boolean") out.allowEditing = p.allowEditing;
   if (typeof p.trackClaude === "boolean") out.trackClaude = p.trackClaude;
   if (typeof p.trackCursor === "boolean") out.trackCursor = p.trackCursor;
+  if (typeof p.trackCodex === "boolean") out.trackCodex = p.trackCodex;
   return out;
 }
 
@@ -111,7 +114,7 @@ export const usePreferencesStore = defineStore("preferences", () => {
 
   async function update(patch: Partial<Preferences>) {
     const next: Preferences = { ...prefs.value, ...patch };
-    if (!next.trackClaude && !next.trackCursor) {
+    if (!hasTrackedProduct(next)) {
       toolingErrorKey.value = "settings.toolingLastError";
       error.value = null;
       return;
@@ -122,7 +125,8 @@ export const usePreferencesStore = defineStore("preferences", () => {
       patch.watchOnStart !== undefined && patch.watchOnStart !== prefs.value.watchOnStart;
     const toolingChanged =
       (patch.trackClaude !== undefined && patch.trackClaude !== prefs.value.trackClaude) ||
-      (patch.trackCursor !== undefined && patch.trackCursor !== prefs.value.trackCursor);
+      (patch.trackCursor !== undefined && patch.trackCursor !== prefs.value.trackCursor) ||
+      (patch.trackCodex !== undefined && patch.trackCodex !== prefs.value.trackCodex);
 
     prefs.value = next;
     writeLocal(prefs.value);

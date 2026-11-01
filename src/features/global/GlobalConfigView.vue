@@ -5,10 +5,11 @@ import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import { artifactToItem } from "@/lib/browser";
 import { shortenPath } from "@/lib/format";
-import { PRODUCT_LABEL, PRODUCT_DIR_LABEL, resolveProduct } from "@/lib/labels";
+import { PRODUCT_DIR_LABEL, resolveProduct } from "@/lib/labels";
 import { isProjectScope } from "@/lib/normalize";
-import { isProductTracked } from "@/lib/tooling";
-import Badge from "@/components/common/Badge.vue";
+import type { Product } from "@/types/config";
+import { isProductTracked, trackedProviders } from "@/lib/tooling";
+import ProductBadge from "@/components/common/ProductBadge.vue";
 import Icon from "@/components/common/Icon.vue";
 import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
 
@@ -26,28 +27,27 @@ const items = computed(() =>
 
 const hasManaged = computed(() => items.value.some((i) => i.scope === "managed"));
 
-const claudeRoot = computed(() => scan.globalMeta.configDir || "~/.claude");
-const cursorRoot = computed(
-  () => scan.globalMeta.cursorConfigDir || "~/.cursor",
-);
+const rootByProduct = computed<Record<Product, string>>(() => ({
+  claude: scan.globalMeta.configDir || `~/${PRODUCT_DIR_LABEL.claude}`,
+  cursor: scan.globalMeta.cursorConfigDir || `~/${PRODUCT_DIR_LABEL.cursor}`,
+  codex: scan.globalMeta.codexConfigDir || `~/${PRODUCT_DIR_LABEL.codex}`,
+}));
 
-const showClaude = computed(() => prefs.prefs.trackClaude);
-const showCursor = computed(() => prefs.prefs.trackCursor);
-
-const productCounts = computed(() => {
-  let claude = 0;
-  let cursor = 0;
+const productRows = computed(() => {
+  const counts: Record<string, number> = {};
   for (const i of items.value) {
-    if (resolveProduct(i.product) === "cursor") cursor += 1;
-    else claude += 1;
+    const product = resolveProduct(i.product);
+    counts[product] = (counts[product] ?? 0) + 1;
   }
-  return { claude, cursor };
+  return trackedProviders(prefs.prefs).map((prov) => ({
+    id: prov.id,
+    root: rootByProduct.value[prov.id],
+    count: counts[prov.id] ?? 0,
+  }));
 });
 
 const emptyDescription = computed(() => {
-  const roots: string[] = [];
-  if (prefs.prefs.trackClaude) roots.push(`~/${PRODUCT_DIR_LABEL.claude}`);
-  if (prefs.prefs.trackCursor) roots.push(`~/${PRODUCT_DIR_LABEL.cursor}`);
+  const roots = trackedProviders(prefs.prefs).map((p) => `~/${PRODUCT_DIR_LABEL[p.id]}`);
   const listed = roots.length ? roots.join(", ") : t("global.emptyRootsFallback");
   return t("global.emptyDescription", { roots: listed });
 });
@@ -56,20 +56,17 @@ const emptyDescription = computed(() => {
 <template>
   <div class="flex h-full min-h-0 flex-col">
     <div
-      v-if="showClaude || showCursor || hasManaged"
+      v-if="productRows.length || hasManaged"
       class="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-elevated/30 px-4 py-1.5 text-xs text-muted"
     >
-      <span v-if="showClaude" class="flex items-center gap-1.5">
-        <Badge tone="info">{{ PRODUCT_LABEL.claude }}</Badge>
-        <span class="font-mono text-2xs" :title="claudeRoot">{{ shortenPath(claudeRoot) }}</span>
-        <span class="font-mono text-2xs text-subtle">{{ productCounts.claude }}</span>
-      </span>
-      <span v-if="showClaude && showCursor" class="text-subtle">·</span>
-      <span v-if="showCursor" class="flex items-center gap-1.5">
-        <Badge tone="accent">{{ PRODUCT_LABEL.cursor }}</Badge>
-        <span class="font-mono text-2xs" :title="cursorRoot">{{ shortenPath(cursorRoot) }}</span>
-        <span class="font-mono text-2xs text-subtle">{{ productCounts.cursor }}</span>
-      </span>
+      <template v-for="(row, i) in productRows" :key="row.id">
+        <span v-if="i > 0" class="text-subtle">·</span>
+        <span class="flex items-center gap-1.5">
+          <ProductBadge :product="row.id" />
+          <span class="font-mono text-2xs" :title="row.root">{{ shortenPath(row.root) }}</span>
+          <span class="font-mono text-2xs text-subtle">{{ row.count }}</span>
+        </span>
+      </template>
       <span
         v-if="hasManaged"
         class="ml-auto flex items-center gap-1.5 text-xs text-muted"
