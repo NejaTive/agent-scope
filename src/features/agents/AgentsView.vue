@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import type { BrowserItem } from "@/lib/browser";
-import { trackedPathHint } from "@/lib/tooling";
+import { PRODUCT_DIR_LABEL } from "@/lib/labels";
+import { trackedProviders } from "@/lib/tooling";
 import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
 import FieldList from "@/components/common/FieldList.vue";
 
+const { t } = useI18n();
 const scan = useScanStore();
 const prefs = usePreferencesStore();
 const byId = computed(() => new Map(scan.agents.map((a) => [a.id, a])));
@@ -28,28 +31,39 @@ const items = computed<BrowserItem[]>(() =>
   })),
 );
 
-const emptyDescription = computed(
-  () =>
-    `Субагенты лежат в ${trackedPathHint(prefs.prefs, "agents/*.md")} на уровне пользователя или проекта.`,
-);
+const emptyDescription = computed(() => {
+  const parts = trackedProviders(prefs.prefs).map((p) => `${PRODUCT_DIR_LABEL[p.id]}/agents/*.md`);
+  const where =
+    parts.length === 0
+      ? "agents/*.md"
+      : parts.length === 1
+        ? parts[0]!
+        : `${parts.slice(0, -1).join(", ")} ${t("common.and")} ${parts[parts.length - 1]}`;
+  return t("agents.emptyHint", { where });
+});
+
+function detailFields(id: string) {
+  const agent = byId.value.get(id);
+  return [
+    { label: t("agents.model"), value: agent?.model },
+    { label: t("agents.tools"), value: agent?.tools },
+    {
+      label: t("agents.validity"),
+      value: agent?.valid === false ? t("agents.invalid") : null,
+    },
+  ];
+}
 </script>
 
 <template>
   <ArtifactBrowser
     :items="items"
     :loading="!scan.initialized"
-    empty-title="Агенты не найдены"
+    :empty-title="t('empty.noAgents')"
     :empty-description="emptyDescription"
   >
     <template #detail="{ item }">
-      <FieldList
-        title="Frontmatter"
-        :fields="[
-          { label: 'Модель', value: byId.get(item.id)?.model },
-          { label: 'Инструменты', value: byId.get(item.id)?.tools },
-          { label: 'Валидность', value: byId.get(item.id)?.valid === false ? 'нет имени или описания' : null },
-        ]"
-      />
+      <FieldList :title="t('agents.frontmatter')" :fields="detailFields(item.id)" />
     </template>
   </ArtifactBrowser>
 </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import type { BrowserItem } from "@/lib/browser";
@@ -9,6 +10,7 @@ import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
 import FieldList, { type Field } from "@/components/common/FieldList.vue";
 import Badge from "@/components/common/Badge.vue";
 
+const { t } = useI18n();
 const scan = useScanStore();
 const prefs = usePreferencesStore();
 const byId = computed(() => new Map(scan.mcpServers.map((s) => [s.id, s])));
@@ -32,11 +34,11 @@ const items = computed<BrowserItem[]>(() =>
 
 function connectionFields(s: McpServerEntry): Field[] {
   return [
-    { label: "Тип", value: s.serverType },
-    { label: "Источник", value: s.origin },
-    { label: "Команда", value: s.command },
-    { label: "Аргументы", value: s.args },
-    { label: "URL", value: s.url },
+    { label: t("mcp.type"), value: s.serverType },
+    { label: t("mcp.origin"), value: s.origin },
+    { label: t("mcp.command"), value: s.command },
+    { label: t("mcp.args"), value: s.args },
+    { label: t("mcp.url"), value: s.url },
   ];
 }
 
@@ -54,10 +56,10 @@ const emptyDescription = computed(() => {
   const parts = [".mcp.json"];
   if (prefs.prefs.trackClaude) parts.push("~/.claude.json");
   if (prefs.prefs.trackCursor) parts.push("~/.cursor/mcp.json");
-  parts.push("файлах настроек");
+  parts.push(t("mcp.settingsFiles"));
   const head = parts.slice(0, -1).join(", ");
   const last = parts[parts.length - 1];
-  return `Серверы объявляются в ${head} и ${last}.`;
+  return t("mcp.emptyHint", { sources: `${head} ${t("common.and")} ${last}` });
 });
 </script>
 
@@ -66,25 +68,25 @@ const emptyDescription = computed(() => {
     :items="items"
     :loading="!scan.initialized"
     collapsed-content
-    content-label="Исходный файл"
-    empty-title="MCP-серверы не настроены"
+    :content-label="t('mcp.sourceFile')"
+    :empty-title="t('mcp.emptyTitle')"
     :empty-description="emptyDescription"
   >
     <template #detail="{ item }">
       <template v-if="byId.get(item.id)">
-        <FieldList title="Подключение" :fields="connectionFields(byId.get(item.id)!)" />
+        <FieldList :title="t('mcp.connection')" :fields="connectionFields(byId.get(item.id)!)" />
         <FieldList
           v-if="recordFields('env', byId.get(item.id)!, 'env').length"
-          title="Окружение"
+          :title="t('mcp.env')"
           :fields="recordFields('env', byId.get(item.id)!, 'env')"
         />
         <FieldList
           v-if="recordFields('header', byId.get(item.id)!, 'headers').length"
-          title="Заголовки"
+          :title="t('mcp.headers')"
           :fields="recordFields('header', byId.get(item.id)!, 'headers')"
         />
         <p class="flex items-center gap-1.5 text-2xs text-subtle">
-          <Badge tone="neutral">скрыто</Badge> Секретные значения маскируются перед показом.
+          <Badge tone="neutral">{{ t("mcp.masked") }}</Badge> {{ t("mcp.secretsHint") }}
         </p>
       </template>
     </template>

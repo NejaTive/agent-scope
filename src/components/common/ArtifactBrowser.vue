@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, toRef, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { storeToRefs } from "pinia";
 import { useSearch } from "@/composables/useSearch";
 import { useUiStore } from "@/stores/ui";
@@ -46,16 +47,23 @@ const props = withDefaults(
   }>(),
   {
     loading: false,
-    emptyTitle: "Ничего не найдено",
-    emptyDescription: "Подходящие элементы не обнаружены.",
+    emptyTitle: undefined,
+    emptyDescription: undefined,
     kindFilter: false,
     showKind: false,
     showProduct: false,
     collapsedContent: false,
-    contentLabel: "Содержимое файла",
+    contentLabel: undefined,
     listWidth: 340,
   },
 );
+
+const { t, locale } = useI18n();
+const resolvedEmptyTitle = computed(() => props.emptyTitle ?? t("empty.defaultTitle"));
+const resolvedEmptyDescription = computed(
+  () => props.emptyDescription ?? t("browser.emptyDescription"),
+);
+const resolvedContentLabel = computed(() => props.contentLabel ?? t("artifact.contentLabel"));
 
 const ui = useUiStore();
 const prefs = usePreferencesStore();
@@ -97,7 +105,7 @@ const kindCounts = computed(() => {
 const kindOptions = computed(() =>
   [...kindCounts.value.entries()]
     .map(([k, n]) => ({ kind: k, count: n, label: kindLabel(k) }))
-    .sort((a, b) => a.label.localeCompare(b.label, "ru")),
+    .sort((a, b) => a.label.localeCompare(b.label, locale.value)),
 );
 
 const kindScoped = computed(() =>
@@ -208,7 +216,7 @@ watch(
             :class="product === 'all' && 'chip-active'"
             @click="product = 'all'"
           >
-            Все
+            {{ t("common.all") }}
           </button>
           <button
             v-for="c in productChips"
@@ -228,7 +236,7 @@ watch(
             :value="kind"
             @change="kind = ($event.target as HTMLSelectElement).value"
           >
-            <option value="all">Все типы</option>
+            <option value="all">{{ t("browser.allKinds") }}</option>
             <option v-for="o in kindOptions" :key="o.kind" :value="o.kind">
               {{ o.label }}
             </option>
@@ -239,7 +247,7 @@ watch(
             :value="scope"
             @change="scope = ($event.target as HTMLSelectElement).value as Scope | 'all'"
           >
-            <option value="all">Все области</option>
+            <option value="all">{{ t("browser.allScopes") }}</option>
             <option v-for="o in scopeOptions" :key="o.scope" :value="o.scope">
               {{ o.label }}
             </option>
@@ -248,10 +256,10 @@ watch(
             v-if="filtersActive"
             type="button"
             class="btn-ghost !h-7 !px-1.5 text-2xs"
-            title="Сбросить фильтры"
+            :title="t('browser.resetFilters')"
             @click="resetFilters"
           >
-            Сбросить
+            {{ t("common.reset") }}
           </button>
           <span class="ml-auto pr-1 font-mono text-2xs text-subtle">{{ sorted.length }}</span>
         </div>
@@ -262,8 +270,8 @@ watch(
         <EmptyState
           v-else-if="!sorted.length"
           compact
-          :title="items.length ? 'Нет совпадений' : emptyTitle"
-          :description="items.length ? 'Измените поиск или фильтр продукта / области.' : emptyDescription"
+          :title="items.length ? t('browser.noMatches') : resolvedEmptyTitle"
+          :description="items.length ? t('browser.noMatchesHint') : resolvedEmptyDescription"
         />
         <ul v-else class="py-1" role="listbox">
           <li v-for="item in sorted" :key="item.id" role="option" :aria-selected="item.id === selectedId">
@@ -305,13 +313,18 @@ watch(
         :key="selected.id"
         :item="selected"
         :collapsed-content="collapsedContent"
-        :content-label="contentLabel"
+        :content-label="resolvedContentLabel"
       >
         <template #extra>
           <slot name="detail" :item="selected" />
         </template>
       </ArtifactDetail>
-      <EmptyState v-else title="Выберите элемент" description="Выберите запись слева, чтобы просмотреть её." icon="eye" />
+      <EmptyState
+        v-else
+        :title="t('browser.selectItem')"
+        :description="t('browser.selectItemHint')"
+        icon="eye"
+      />
     </section>
   </div>
 </template>

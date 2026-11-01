@@ -86,6 +86,10 @@ impl Storage {
         if let Some(t) = self.get_pref("theme")? {
             p.theme = t;
         }
+        // Missing locale → "ru" (Default) for older DBs.
+        if let Some(t) = self.get_pref("locale")? {
+            p.locale = t;
+        }
         if let Some(v) = self.get_pref("watchOnStart")? {
             p.watch_on_start = v == "true";
         }
@@ -107,6 +111,7 @@ impl Storage {
 
     pub fn set_preferences(&self, p: &Preferences) -> AppResult<()> {
         self.set_pref("theme", &p.theme)?;
+        self.set_pref("locale", &p.locale)?;
         self.set_pref("watchOnStart", &p.watch_on_start.to_string())?;
         self.set_pref("notifications", &p.notifications.to_string())?;
         self.set_pref("allowEditing", &p.allow_editing.to_string())?;
@@ -221,6 +226,7 @@ mod tests {
         assert_eq!(s.get_preferences().unwrap().theme, "system");
         let p = Preferences {
             theme: "dark".into(),
+            locale: "en".into(),
             watch_on_start: true,
             notifications: true,
             allow_editing: true,
@@ -230,9 +236,11 @@ mod tests {
         s.set_preferences(&p).unwrap();
         let got = s.get_preferences().unwrap();
         assert_eq!(got.theme, "dark");
+        assert_eq!(got.locale, "en");
         assert!(got.watch_on_start && got.notifications && got.allow_editing);
         assert!(got.track_claude && !got.track_cursor);
         assert!(!Preferences::default().allow_editing);
+        assert_eq!(Preferences::default().locale, "ru");
         assert!(Preferences::default().track_claude && Preferences::default().track_cursor);
         s.set_pref("theme", "light").unwrap();
         assert_eq!(s.get_pref("theme").unwrap().as_deref(), Some("light"));

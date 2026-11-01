@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import type { BrowserItem } from "@/lib/browser";
@@ -7,6 +8,7 @@ import { PRODUCT_DIR_LABEL } from "@/lib/labels";
 import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
 import FieldList from "@/components/common/FieldList.vue";
 
+const { t } = useI18n();
 const scan = useScanStore();
 const prefs = usePreferencesStore();
 const byId = computed(() => new Map(scan.rules.map((r) => [r.id, r])));
@@ -15,7 +17,7 @@ const items = computed<BrowserItem[]>(() =>
   scan.rules.map((r) => ({
     id: r.id,
     name: r.name,
-    subtitle: r.paths.length ? `Применяется к ${r.paths.join(", ")}` : null,
+    subtitle: r.paths.length ? t("rules.appliesTo", { paths: r.paths.join(", ") }) : null,
     scope: r.scope,
     status: r.status,
     mtime: r.mtime,
@@ -32,26 +34,36 @@ const emptyDescription = computed(() => {
   const parts: string[] = [];
   if (prefs.prefs.trackClaude) parts.push(`${PRODUCT_DIR_LABEL.claude}/rules/*.md`);
   if (prefs.prefs.trackCursor) parts.push(`${PRODUCT_DIR_LABEL.cursor}/rules/*.mdc`);
-  const where = parts.length ? parts.join(" и ") : "каталогах правил";
-  return `Правила лежат в ${where} на уровне пользователя или проекта.`;
+  const where =
+    parts.length === 0
+      ? t("rules.emptyWhereFallback")
+      : parts.length === 1
+        ? parts[0]!
+        : `${parts.slice(0, -1).join(", ")} ${t("common.and")} ${parts[parts.length - 1]}`;
+  return t("rules.emptyHint", { where });
 });
+
+function detailFields(id: string) {
+  const rule = byId.value.get(id);
+  return [
+    { label: t("rules.pathGlobs"), value: rule?.paths },
+    {
+      label: t("rules.conditional"),
+      value: rule?.conditional ? t("rules.conditionalYes") : null,
+    },
+  ];
+}
 </script>
 
 <template>
   <ArtifactBrowser
     :items="items"
     :loading="!scan.initialized"
-    empty-title="Правила не найдены"
+    :empty-title="t('empty.noRules')"
     :empty-description="emptyDescription"
   >
     <template #detail="{ item }">
-      <FieldList
-        title="Область"
-        :fields="[
-          { label: 'Глобы путей', value: byId.get(item.id)?.paths },
-          { label: 'Условное', value: byId.get(item.id)?.conditional ? 'да (только для совпадающих путей)' : null },
-        ]"
-      />
+      <FieldList :title="t('rules.scope')" :fields="detailFields(item.id)" />
     </template>
   </ArtifactBrowser>
 </template>

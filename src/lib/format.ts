@@ -1,4 +1,9 @@
+import { getLocale, tr } from "@/i18n";
 import type { Timestamp } from "@/types/config";
+
+function localeTag(): string {
+  return getLocale();
+}
 
 export function toDate(ts: Timestamp | undefined): Date | null {
   if (ts === null || ts === undefined || ts === "") return null;
@@ -15,8 +20,8 @@ export function toDate(ts: Timestamp | undefined): Date | null {
 
 export function formatTime(ts: Timestamp | undefined): string {
   const d = toDate(ts);
-  if (!d) return "—";
-  return d.toLocaleString("ru", {
+  if (!d) return tr("common.emDash");
+  return d.toLocaleString(localeTag(), {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -27,17 +32,17 @@ export function formatTime(ts: Timestamp | undefined): string {
 
 export function relativeTime(ts: Timestamp | undefined, now = Date.now()): string {
   const d = toDate(ts);
-  if (!d) return "никогда";
+  if (!d) return tr("common.never");
   const s = Math.round((now - d.getTime()) / 1000);
-  if (s < 5) return "только что";
-  if (s < 60) return `${s} с назад`;
+  if (s < 5) return tr("common.justNow");
+  if (s < 60) return tr("common.secondsAgo", { n: s });
   const m = Math.round(s / 60);
-  if (m < 60) return `${m} мин назад`;
+  if (m < 60) return tr("common.minutesAgo", { n: m });
   const h = Math.round(m / 60);
-  if (h < 24) return `${h} ч назад`;
+  if (h < 24) return tr("common.hoursAgo", { n: h });
   const days = Math.round(h / 24);
-  if (days < 30) return `${days} дн. назад`;
-  return d.toLocaleDateString("ru");
+  if (days < 30) return tr("common.daysAgo", { n: days });
+  return d.toLocaleDateString(localeTag());
 }
 
 export function basename(path: string): string {
@@ -51,14 +56,14 @@ export function shortenPath(path: string): string {
 }
 
 export function formatBytes(n: number | null | undefined): string {
-  if (n === null || n === undefined) return "—";
+  if (n === null || n === undefined) return tr("common.emDash");
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
 export function formatValue(v: unknown): string {
-  if (v === undefined) return "—";
+  if (v === undefined) return tr("common.emDash");
   if (typeof v === "string") return v;
   try {
     return JSON.stringify(v);

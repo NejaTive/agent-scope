@@ -21,7 +21,7 @@ export const useUpdatesStore = defineStore("updates", () => {
   const updateAvailable = computed(
     () => status.value === "update-available" && !!result.value?.updateAvailable,
   );
-  /** Tag without leading `v`/`V` for UI copy («Обновление 0.4.0»). */
+  /** Tag without leading `v`/`V` for UI copy (e.g. settings update banner). */
   const latestVersion = computed(() => {
     const raw = result.value?.latestVersion;
     if (!raw) return null;

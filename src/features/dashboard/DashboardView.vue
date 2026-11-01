@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import { useUiStore } from "@/stores/ui";
 import { formatTime, relativeTime, shortenPath } from "@/lib/format";
 import { PRODUCT_LABEL, resolveProduct } from "@/lib/labels";
-import { RU, pluralCount } from "@/lib/plural";
+import { pluralCountLocale } from "@/lib/plural";
 import { isProductTracked } from "@/lib/tooling";
 import Badge from "@/components/common/Badge.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import ScopeBadge from "@/components/common/ScopeBadge.vue";
 
+const { t } = useI18n();
 const scan = useScanStore();
 const prefs = usePreferencesStore();
 const ui = useUiStore();
@@ -39,24 +41,24 @@ const showCursor = computed(() => prefs.prefs.trackCursor);
 const cards = computed(() => {
   const d = scan.dashboard;
   return [
-    { label: "Проекты", value: d.projectCount, to: "/projects" },
-    { label: "Глобальные скиллы", value: d.globalSkills, to: "/skills" },
-    { label: "Проектные скиллы", value: d.projectSkills, to: "/skills" },
-    { label: "Правила", value: d.rules, to: "/rules" },
-    { label: "Агенты", value: d.agents, to: "/agents" },
-    { label: "Хуки", value: d.hooks, to: "/hooks" },
-    { label: "MCP-серверы", value: d.mcpServers, to: "/mcp" },
-    { label: "Плагины", value: d.plugins, to: "/plugins" },
-    { label: "Команды", value: d.commands, to: "/skills" },
-    { label: "Файлы памяти", value: d.memories, to: "/memory" },
+    { label: t("dashboard.projects"), value: d.projectCount, to: "/projects" },
+    { label: t("dashboard.globalSkills"), value: d.globalSkills, to: "/skills" },
+    { label: t("dashboard.projectSkills"), value: d.projectSkills, to: "/skills" },
+    { label: t("dashboard.rules"), value: d.rules, to: "/rules" },
+    { label: t("dashboard.agents"), value: d.agents, to: "/agents" },
+    { label: t("dashboard.hooks"), value: d.hooks, to: "/hooks" },
+    { label: t("dashboard.mcpServers"), value: d.mcpServers, to: "/mcp" },
+    { label: t("dashboard.plugins"), value: d.plugins, to: "/plugins" },
+    { label: t("dashboard.commands"), value: d.commands, to: "/skills" },
+    { label: t("dashboard.memories"), value: d.memories, to: "/memory" },
   ];
 });
 
-const CONFLICT_KIND_LABEL: Record<string, string> = {
-  duplicateName: "дубликат имени",
-  mcpMismatch: "несовпадение MCP",
-  settingOverride: "переопределение настройки",
-};
+const conflictKindLabel = computed<Record<string, string>>(() => ({
+  duplicateName: t("dashboard.conflictDuplicateName"),
+  mcpMismatch: t("dashboard.conflictMcpMismatch"),
+  settingOverride: t("dashboard.conflictSettingOverride"),
+}));
 
 const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
   created: "ok",
@@ -80,16 +82,16 @@ const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
         <template v-if="showClaude">
           <Badge tone="info">{{ PRODUCT_LABEL.claude }}</Badge>
           <span>
-            {{ pluralCount(productStats.claude, RU.artifact) }} ·
-            {{ pluralCount(productStats.withClaude, RU.project) }}
+            {{ pluralCountLocale(productStats.claude, "artifact") }} ·
+            {{ pluralCountLocale(productStats.withClaude, "project") }}
           </span>
         </template>
         <span v-if="showClaude && showCursor" class="text-subtle">·</span>
         <template v-if="showCursor">
           <Badge tone="accent">{{ PRODUCT_LABEL.cursor }}</Badge>
           <span>
-            {{ pluralCount(productStats.cursor, RU.artifact) }} ·
-            {{ pluralCount(productStats.withCursor, RU.project) }}
+            {{ pluralCountLocale(productStats.cursor, "artifact") }} ·
+            {{ pluralCountLocale(productStats.withCursor, "project") }}
           </span>
         </template>
       </section>
@@ -109,7 +111,7 @@ const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
             </div>
           </button>
           <div class="card px-3 py-2.5">
-            <div class="label">Последнее сканирование</div>
+            <div class="label">{{ t("dashboard.lastScan") }}</div>
             <div class="mt-1 text-[13px] font-medium">{{ relativeTime(scan.lastScanAt) }}</div>
             <div class="text-2xs text-subtle">
               {{ formatTime(scan.lastScanAt) }}
@@ -120,7 +122,7 @@ const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
       </section>
 
       <section v-if="scan.scanErrors.length">
-        <h2 class="label mb-2">Ошибки сканирования ({{ scan.scanErrors.length }})</h2>
+        <h2 class="label mb-2">{{ t("dashboard.scanErrors", { count: scan.scanErrors.length }) }}</h2>
         <ul class="card divide-y divide-line">
           <li v-for="(e, i) in scan.scanErrors" :key="i" class="flex flex-col gap-0.5 px-3 py-1.5">
             <span class="break-all font-mono text-[11.5px] text-muted">{{ shortenPath(e.path) }}</span>
@@ -130,14 +132,14 @@ const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
       </section>
 
       <section v-if="scan.conflicts.length">
-        <h2 class="label mb-2">Конфликты ({{ scan.conflicts.length }})</h2>
+        <h2 class="label mb-2">{{ t("dashboard.conflicts", { count: scan.conflicts.length }) }}</h2>
         <ul class="card divide-y divide-line">
           <li v-for="(c, i) in scan.conflicts" :key="c.id ?? i" class="flex items-start gap-2 px-3 py-1.5">
             <Badge :tone="c.severity === 'info' ? 'info' : 'warn'">{{ c.severity }}</Badge>
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-1.5">
                 <span class="font-mono text-xs">{{ c.key }}</span>
-                <Badge mono>{{ CONFLICT_KIND_LABEL[c.kind] ?? c.kind }}</Badge>
+                <Badge mono>{{ conflictKindLabel[c.kind] ?? c.kind }}</Badge>
               </div>
               <div class="text-xs text-muted">{{ c.message }}</div>
             </div>
@@ -149,13 +151,13 @@ const CHANGE_TONE: Record<string, "ok" | "info" | "danger"> = {
       </section>
 
       <section>
-        <h2 class="label mb-2">Недавние изменения</h2>
+        <h2 class="label mb-2">{{ t("dashboard.recentChanges") }}</h2>
         <div v-if="!scan.recentChanges.length" class="card h-40">
           <EmptyState
             compact
             icon="activity"
-            title="Нет недавних изменений"
-            description="Изменения файлов в каталогах включённых AI-инструментов появятся здесь."
+            :title="t('dashboard.noRecentChanges')"
+            :description="t('dashboard.noRecentChangesHint')"
           />
         </div>
         <ul v-else class="card divide-y divide-line">

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { useScanStore } from "@/stores/scan";
 import type { BrowserItem } from "@/lib/browser";
 import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
 import FieldList from "@/components/common/FieldList.vue";
 
+const { t } = useI18n();
 const scan = useScanStore();
 const byId = computed(() => new Map(scan.hooks.map((h) => [h.id, h])));
 
@@ -24,6 +26,19 @@ const items = computed<BrowserItem[]>(() =>
     searchText: [h.event, h.matcher, h.hookType, h.command, h.prompt].filter(Boolean).join(" "),
   })),
 );
+
+function detailFields(id: string) {
+  const h = byId.value.get(id);
+  return [
+    { label: t("hooks.event"), value: h?.event },
+    { label: t("hooks.matcher"), value: h?.matcher },
+    { label: t("hooks.type"), value: h?.hookType },
+    { label: t("hooks.command"), value: h?.command },
+    { label: t("hooks.timeout"), value: h?.timeout != null ? `${h.timeout}s` : null },
+    { label: t("hooks.prompt"), value: h?.prompt },
+    { label: t("hooks.declaredIn"), value: h?.sourcePath },
+  ];
+}
 </script>
 
 <template>
@@ -31,23 +46,15 @@ const items = computed<BrowserItem[]>(() =>
     :items="items"
     :loading="!scan.initialized"
     collapsed-content
-    content-label="Исходный файл"
-    empty-title="Хуки не настроены"
-    empty-description="Хуки объявляются в settings.json (пользователь, проект или локальный) и в плагинах."
+    :content-label="t('hooks.sourceFile')"
+    :empty-title="t('hooks.emptyTitle')"
+    :empty-description="t('hooks.emptyHint')"
   >
     <template #detail="{ item }">
       <FieldList
         v-if="byId.get(item.id)"
-        title="Хук"
-        :fields="[
-          { label: 'Событие', value: byId.get(item.id)?.event },
-          { label: 'Матчер', value: byId.get(item.id)?.matcher },
-          { label: 'Тип', value: byId.get(item.id)?.hookType },
-          { label: 'Команда', value: byId.get(item.id)?.command },
-          { label: 'Таймаут', value: byId.get(item.id)?.timeout != null ? `${byId.get(item.id)?.timeout}s` : null },
-          { label: 'Промпт', value: byId.get(item.id)?.prompt },
-          { label: 'Объявлен в', value: byId.get(item.id)?.sourcePath },
-        ]"
+        :title="t('hooks.hook')"
+        :fields="detailFields(item.id)"
       />
     </template>
   </ArtifactBrowser>

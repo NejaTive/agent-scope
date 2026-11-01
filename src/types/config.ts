@@ -55,6 +55,9 @@ export type ConflictSeverity = "info" | "warning";
 
 export type ThemePreference = "dark" | "light" | "system";
 
+/** UI language. Default `ru` for existing installs. */
+export type AppLocale = "ru" | "en";
+
 /** Arbitrary JSON value (frontmatter, config, metadata, ...). */
 export type Json = unknown;
 
@@ -331,6 +334,8 @@ export interface UpdateCheckResult {
 
 export interface Preferences {
   theme: ThemePreference;
+  /** UI language. Default `ru`. */
+  locale: AppLocale;
   watchOnStart: boolean;
   notifications: boolean;
   /** Opt-in: allow writing allowlisted config files. Default false. */

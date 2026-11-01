@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import { artifactToItem } from "@/lib/browser";
@@ -11,6 +12,7 @@ import Badge from "@/components/common/Badge.vue";
 import Icon from "@/components/common/Icon.vue";
 import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
 
+const { t } = useI18n();
 const scan = useScanStore();
 const prefs = usePreferencesStore();
 
@@ -46,8 +48,8 @@ const emptyDescription = computed(() => {
   const roots: string[] = [];
   if (prefs.prefs.trackClaude) roots.push(`~/${PRODUCT_DIR_LABEL.claude}`);
   if (prefs.prefs.trackCursor) roots.push(`~/${PRODUCT_DIR_LABEL.cursor}`);
-  const listed = roots.length ? roots.join(", ") : "каталогах конфигурации";
-  return `Ничего не обнаружено в ${listed} или управляемых каталогах. Запустите сканирование для обновления.`;
+  const listed = roots.length ? roots.join(", ") : t("global.emptyRootsFallback");
+  return t("global.emptyDescription", { roots: listed });
 });
 </script>
 
@@ -73,7 +75,7 @@ const emptyDescription = computed(() => {
         class="ml-auto flex items-center gap-1.5 text-xs text-muted"
       >
         <Icon name="lock" :size="12" />
-        Управляемые настройки задаются организацией и показаны только для справки.
+        {{ t("global.managedHint") }}
       </span>
     </div>
     <div class="min-h-0 flex-1">
@@ -82,7 +84,7 @@ const emptyDescription = computed(() => {
         :loading="!scan.initialized"
         kind-filter
         show-kind
-        empty-title="Глобальные не найдены"
+        :empty-title="t('global.emptyTitle')"
         :empty-description="emptyDescription"
       />
     </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { maskDeep } from "@/lib/secrets";
 import CodeViewer from "./CodeViewer.vue";
 
@@ -15,13 +16,18 @@ const props = withDefaults(
   { maxHeight: undefined, lineNumbers: false },
 );
 
+const { t } = useI18n();
+
 const parsed = computed<{ code: string; error: string | null }>(() => {
   if (props.text !== undefined) {
     try {
       const v = maskDeep(JSON.parse(props.text));
       return { code: JSON.stringify(v, null, 2), error: null };
     } catch (e) {
-      return { code: props.text, error: e instanceof Error ? e.message : "Некорректный JSON" };
+      return {
+        code: props.text,
+        error: e instanceof Error ? e.message : t("common.invalidJson"),
+      };
     }
   }
   try {
@@ -38,7 +44,7 @@ const parsed = computed<{ code: string; error: string | null }>(() => {
       v-if="parsed.error"
       class="rounded-md border border-warn/30 bg-warn/10 px-2 py-1 text-xs text-warn"
     >
-      Некорректный JSON: {{ parsed.error }}
+      {{ t("common.invalidJsonDetail", { error: parsed.error }) }}
     </div>
     <CodeViewer
       :code="parsed.code"

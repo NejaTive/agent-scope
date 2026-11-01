@@ -2,7 +2,8 @@ import { createRouter, createWebHashHistory, type RouteRecordRaw } from "vue-rou
 
 declare module "vue-router" {
   interface RouteMeta {
-    title?: string;
+    /** i18n key under `nav.*` (or full key path). */
+    titleKey?: string;
     /** Whether the header search box filters this view. */
     searchable?: boolean;
   }
@@ -13,85 +14,85 @@ export const routes: RouteRecordRaw[] = [
     path: "/",
     name: "overview",
     component: () => import("@/features/dashboard/DashboardView.vue"),
-    meta: { title: "Обзор" },
+    meta: { titleKey: "nav.overview" },
   },
   {
     path: "/global",
     name: "global",
     component: () => import("@/features/global/GlobalConfigView.vue"),
-    meta: { title: "Глобальные", searchable: true },
+    meta: { titleKey: "nav.global", searchable: true },
   },
   {
     path: "/projects",
     name: "projects",
     component: () => import("@/features/projects/ProjectsView.vue"),
-    meta: { title: "Проекты", searchable: true },
+    meta: { titleKey: "nav.projects", searchable: true },
   },
   {
     path: "/projects/:id",
     name: "project-detail",
     component: () => import("@/features/projects/ProjectDetailView.vue"),
-    meta: { title: "Проект", searchable: true },
+    meta: { titleKey: "nav.project", searchable: true },
   },
   {
     path: "/skills",
     name: "skills",
     component: () => import("@/features/skills/SkillsView.vue"),
-    meta: { title: "Скиллы", searchable: true },
+    meta: { titleKey: "nav.skills", searchable: true },
   },
   {
     path: "/rules",
     name: "rules",
     component: () => import("@/features/rules/RulesView.vue"),
-    meta: { title: "Правила", searchable: true },
+    meta: { titleKey: "nav.rules", searchable: true },
   },
   {
     path: "/agents",
     name: "agents",
     component: () => import("@/features/agents/AgentsView.vue"),
-    meta: { title: "Агенты", searchable: true },
+    meta: { titleKey: "nav.agents", searchable: true },
   },
   {
     path: "/hooks",
     name: "hooks",
     component: () => import("@/features/hooks/HooksView.vue"),
-    meta: { title: "Хуки", searchable: true },
+    meta: { titleKey: "nav.hooks", searchable: true },
   },
   {
     path: "/mcp",
     name: "mcp",
     component: () => import("@/features/mcp/McpView.vue"),
-    meta: { title: "MCP-серверы", searchable: true },
+    meta: { titleKey: "nav.mcp", searchable: true },
   },
   {
     path: "/plugins",
     name: "plugins",
     component: () => import("@/features/plugins/PluginsView.vue"),
-    meta: { title: "Плагины", searchable: true },
+    meta: { titleKey: "nav.plugins", searchable: true },
   },
   {
     path: "/permissions",
     name: "permissions",
     component: () => import("@/features/permissions/PermissionsView.vue"),
-    meta: { title: "Права доступа", searchable: true },
+    meta: { titleKey: "nav.permissions", searchable: true },
   },
   {
     path: "/settings",
     name: "settings",
     component: () => import("@/features/settings/SettingsView.vue"),
-    meta: { title: "Настройки", searchable: true },
+    meta: { titleKey: "nav.settings", searchable: true },
   },
   {
     path: "/memory",
     name: "memory",
     component: () => import("@/features/memory/MemoryView.vue"),
-    meta: { title: "Память", searchable: true },
+    meta: { titleKey: "nav.memory", searchable: true },
   },
   {
     path: "/app-settings",
     name: "app-settings",
     component: () => import("@/features/app-settings/AppSettingsView.vue"),
-    meta: { title: "Настройки приложения" },
+    meta: { titleKey: "nav.appSettings" },
   },
   { path: "/:pathMatch(.*)*", redirect: "/" },
 ];

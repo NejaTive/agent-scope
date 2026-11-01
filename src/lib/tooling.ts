@@ -1,3 +1,4 @@
+import { tr } from "@/i18n";
 import type { Preferences, Product } from "@/types/config";
 import { PRODUCT_DIR_LABEL } from "./labels";
 
@@ -19,15 +20,15 @@ export function trackedProviders(prefs: Preferences) {
 /** "Claude Code", "Cursor", or "Claude Code и Cursor". */
 export function trackedProductLabels(prefs: Preferences): string {
   const labels = trackedProviders(prefs).map((p) => p.label);
-  if (labels.length === 0) return "AI-инструментов";
+  if (labels.length === 0) return tr("dashboard.emptyProductsFallback");
   if (labels.length === 1) return labels[0]!;
-  return `${labels.slice(0, -1).join(", ")} и ${labels[labels.length - 1]}`;
+  return `${labels.slice(0, -1).join(", ")} ${tr("common.and")} ${labels[labels.length - 1]}`;
 }
 
 /** ".claude", ".cursor", or ".claude / .cursor". */
 export function trackedDirLabels(prefs: Preferences): string {
   const dirs = trackedProviders(prefs).map((p) => PRODUCT_DIR_LABEL[p.id]);
-  if (dirs.length === 0) return "каталогов конфигурации";
+  if (dirs.length === 0) return tr("memory.emptyDirsFallback");
   if (dirs.length === 1) return dirs[0]!;
   return dirs.join(" / ");
 }
@@ -39,5 +40,5 @@ export function trackedPathHint(prefs: Preferences, segment: string): string {
   );
   if (parts.length === 0) return segment;
   if (parts.length === 1) return parts[0]!;
-  return parts.join(" и ");
+  return parts.join(` ${tr("common.and")} `);
 }

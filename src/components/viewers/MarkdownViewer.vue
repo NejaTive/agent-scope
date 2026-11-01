@@ -1,12 +1,20 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { Marked } from "marked";
 import { escapeHtml, highlight } from "@/lib/highlight";
+import { tr } from "@/i18n";
 
 const props = withDefaults(
   defineProps<{ source: string; showFrontmatter?: boolean }>(),
   { showFrontmatter: true },
 );
+
+const { t } = useI18n();
+
+function imageAlt(text?: string): string {
+  return text ? tr("common.imageAltNamed", { name: text }) : tr("common.imageAlt");
+}
 
 // Files on disk are untrusted: raw HTML is escaped (never injected) and only
 // http(s)/mailto links are rendered as anchors.
@@ -24,11 +32,11 @@ const md = new Marked({
     link({ href, title, tokens }) {
       const label = this.parser.parseInline(tokens);
       if (!/^(https?:|mailto:)/i.test(href)) return label;
-      const t = title ? ` title="${escapeHtml(title)}"` : "";
-      return `<a href="${escapeHtml(href)}"${t} data-external="true">${label}</a>`;
+      const tAttr = title ? ` title="${escapeHtml(title)}"` : "";
+      return `<a href="${escapeHtml(href)}"${tAttr} data-external="true">${label}</a>`;
     },
     image({ text }) {
-      return escapeHtml(text ? `[изображение: ${text}]` : "[изображение]");
+      return escapeHtml(text ? `[${imageAlt(text)}]` : `[${imageAlt()}]`);
     },
   },
 });
@@ -78,7 +86,7 @@ async function onClick(e: MouseEvent) {
       <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-0.5 px-3 py-2 text-xs">
         <template v-for="[k, v] in parts.front" :key="k">
           <dt class="font-mono text-subtle">{{ k }}</dt>
-          <dd class="break-words text-fg">{{ v || "—" }}</dd>
+          <dd class="break-words text-fg">{{ v || t("common.emDash") }}</dd>
         </template>
       </dl>
     </div>

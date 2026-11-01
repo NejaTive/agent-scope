@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { useScanStore } from "@/stores/scan";
 import { artifactToItem } from "@/lib/browser";
 import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
 
+const { t } = useI18n();
 const scan = useScanStore();
 const items = computed(() => scan.plugins.map(artifactToItem));
 </script>
@@ -12,7 +14,7 @@ const items = computed(() => scan.plugins.map(artifactToItem));
   <ArtifactBrowser
     :items="items"
     :loading="!scan.initialized"
-    empty-title="Плагины не найдены"
-    empty-description="Установленные плагины и записи enabledPlugins появляются здесь после сканирования."
+    :empty-title="t('empty.noPlugins')"
+    :empty-description="t('plugins.emptyHint')"
   />
 </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { storeToRefs } from "pinia";
 import { useSettingsDocs } from "@/composables/useSettingsDocs";
 import { matchesQuery } from "@/composables/useSearch";
@@ -34,6 +35,7 @@ interface SettingRow {
   mtime: string | number | null;
 }
 
+const { t } = useI18n();
 const scan = useScanStore();
 const ui = useUiStore();
 const { search, selectedProjectPath } = storeToRefs(ui);
@@ -88,7 +90,7 @@ const selectedProject = computed(() =>
   <div class="flex h-full min-h-0">
     <aside class="flex w-52 shrink-0 flex-col overflow-hidden border-r border-line">
       <div class="min-w-0 shrink-0 border-b border-line px-3 py-2">
-        <ProjectSelect block all-label="Все области" />
+        <ProjectSelect block :all-label="t('settingsPage.allScopes')" />
       </div>
       <nav class="flex-1 space-y-px overflow-y-auto p-2">
         <button
@@ -97,7 +99,7 @@ const selectedProject = computed(() =>
           :class="category === 'all' ? 'bg-elevated text-fg' : 'text-muted hover:bg-elevated/60 hover:text-fg'"
           @click="category = 'all'"
         >
-          Все настройки <span class="font-mono text-2xs text-subtle">{{ rows.length }}</span>
+          {{ t("settingsPage.allSettings") }} <span class="font-mono text-2xs text-subtle">{{ rows.length }}</span>
         </button>
         <button
           v-for="c in SETTINGS_CATEGORIES"
@@ -112,7 +114,7 @@ const selectedProject = computed(() =>
         </button>
       </nav>
       <div class="shrink-0 border-t border-line px-3 py-2 text-2xs text-subtle">
-        <div class="mb-1 flex items-center gap-1"><Icon name="lock" :size="11" /> Только чтение</div>
+        <div class="mb-1 flex items-center gap-1"><Icon name="lock" :size="11" /> {{ t("settingsPage.readOnly") }}</div>
         <div v-for="d in sources" :key="d.artifact.id" class="flex items-center justify-between gap-2 py-px">
           <ScopeBadge :scope="d.artifact.scope" />
           <span :title="d.artifact.path">{{ relativeTime(d.artifact.modifiedAt) }}</span>
@@ -127,19 +129,15 @@ const selectedProject = computed(() =>
           :key="d.artifact.id"
           class="rounded-md border border-warn/30 bg-warn/10 px-3 py-1.5 text-xs text-warn"
         >
-          Не удалось разобрать {{ shortenPath(d.artifact.path) }}: {{ d.error }}
+          {{ t("settingsPage.parseError", { path: shortenPath(d.artifact.path), error: d.error }) }}
         </div>
 
         <LoadingBlock v-if="(loading || !scan.initialized) && !rows.length" :lines="8" />
         <div v-else-if="!visible.length" class="card h-56">
           <EmptyState
             icon="sliders"
-            :title="rows.length ? 'Нет подходящих настроек' : 'Файлы настроек не найдены'"
-            :description="
-              rows.length
-                ? 'Измените категорию или поиск.'
-                : 'Не обнаружены settings.json / settings.local.json / управляемые настройки.'
-            "
+            :title="rows.length ? t('settingsPage.noMatching') : t('settingsPage.noneFound')"
+            :description="rows.length ? t('settingsPage.filterHint') : t('settingsPage.emptyHint')"
           />
         </div>
 
@@ -164,7 +162,7 @@ const selectedProject = computed(() =>
 
         <SettingsDiffPanel v-if="selectedProject" :project-path="selectedProject.path" :query="search" />
         <p v-else class="flex items-center gap-1.5 text-2xs text-subtle">
-          <Icon name="eye" :size="11" /> Выберите проект, чтобы увидеть diff настроек по областям.
+          <Icon name="eye" :size="11" /> {{ t("settingsPage.selectProjectDiff") }}
         </p>
       </div>
     </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, watch } from "vue";
+import { computed, onMounted, onUnmounted, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 const props = withDefaults(
   defineProps<{
@@ -12,8 +13,8 @@ const props = withDefaults(
   }>(),
   {
     description: "",
-    confirmLabel: "Подтвердить",
-    cancelLabel: "Отмена",
+    confirmLabel: undefined,
+    cancelLabel: undefined,
     danger: false,
   },
 );
@@ -22,6 +23,10 @@ const emit = defineEmits<{
   confirm: [];
   cancel: [];
 }>();
+
+const { t } = useI18n();
+const confirmText = computed(() => props.confirmLabel ?? t("common.confirm"));
+const cancelText = computed(() => props.cancelLabel ?? t("common.cancel"));
 
 function onKey(e: KeyboardEvent) {
   if (!props.open) return;
@@ -61,7 +66,7 @@ watch(
         <slot />
         <div class="flex justify-end gap-2 pt-1">
           <button type="button" class="btn !h-7" @click="emit('cancel')">
-            {{ cancelLabel }}
+            {{ cancelText }}
           </button>
           <button
             type="button"
@@ -69,7 +74,7 @@ watch(
             :class="danger ? 'text-danger' : 'btn-accent'"
             @click="emit('confirm')"
           >
-            {{ confirmLabel }}
+            {{ confirmText }}
           </button>
         </div>
       </div>

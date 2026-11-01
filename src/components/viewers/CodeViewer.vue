@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { highlight } from "@/lib/highlight";
 import Icon from "@/components/common/Icon.vue";
 
@@ -14,6 +15,7 @@ const props = withDefaults(
   { language: null, lineNumbers: false, copyable: true },
 );
 
+const { t } = useI18n();
 const html = computed(() => highlight(props.code, props.language));
 const lineCount = computed(() => props.code.split("\n").length);
 const copied = ref(false);
@@ -38,7 +40,7 @@ async function copy() {
       @click="copy"
     >
       <Icon name="copy" :size="12" />
-      {{ copied ? "Скопировано" : "Копировать" }}
+      {{ copied ? t("common.copied") : t("common.copy") }}
     </button>
     <div class="flex overflow-auto" :style="maxHeight ? { maxHeight } : undefined">
       <pre

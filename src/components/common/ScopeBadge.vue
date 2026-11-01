@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import type { Scope } from "@/types/config";
-import { SCOPE_LABEL } from "@/lib/labels";
 import Badge, { type Tone } from "./Badge.vue";
 
 const props = defineProps<{ scope: Scope }>();
+const { t } = useI18n();
 
 const TONE: Record<Scope, Tone> = {
   managed: "danger",
@@ -17,7 +18,7 @@ const TONE: Record<Scope, Tone> = {
 };
 
 const tone = computed(() => TONE[props.scope] ?? "neutral");
-const label = computed(() => SCOPE_LABEL[props.scope] ?? props.scope);
+const label = computed(() => t(`labels.scope.${props.scope}` as `labels.scope.${Scope}`));
 </script>
 
 <template>

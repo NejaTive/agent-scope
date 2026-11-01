@@ -553,6 +553,8 @@ pub struct UpdateCheckResult {
 #[serde(rename_all = "camelCase", default)]
 pub struct Preferences {
     pub theme: String,
+    /// UI language: `ru` | `en`. Default `ru` for existing installs.
+    pub locale: String,
     pub watch_on_start: bool,
     pub notifications: bool,
     /// Opt-in: allow writing allowlisted config files via Edit mode.
@@ -567,6 +569,7 @@ impl Default for Preferences {
     fn default() -> Self {
         Self {
             theme: "system".into(),
+            locale: "ru".into(),
             watch_on_start: false,
             notifications: false,
             allow_editing: false,

@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import { useUiStore } from "@/stores/ui";
 import type { BrowserItem } from "@/lib/browser";
-import { trackedPathHint } from "@/lib/tooling";
+import { PRODUCT_DIR_LABEL } from "@/lib/labels";
+import { trackedProviders } from "@/lib/tooling";
 import type { SkillEntry, UiSkill } from "@/types/config";
 import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
 import FieldList from "@/components/common/FieldList.vue";
 
+const { t } = useI18n();
 const scan = useScanStore();
 const prefs = usePreferencesStore();
 const ui = useUiStore();
@@ -56,20 +59,35 @@ const items = computed<BrowserItem[]>(() =>
   })),
 );
 
+function joinAnd(parts: string[]): string {
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0]!;
+  return `${parts.slice(0, -1).join(", ")} ${t("common.and")} ${parts[parts.length - 1]}`;
+}
+
 const emptyDescription = computed(() => {
-  const skills = trackedPathHint(prefs.prefs, "skills/<name>/SKILL.md");
-  const cmd = prefs.prefs.trackClaude
-    ? "; команды — в .claude/commands/"
-    : "";
-  return `Скиллы лежат в ${skills}${cmd}. Запустите сканирование после добавления корней проектов.`;
+  const skills = joinAnd(
+    trackedProviders(prefs.prefs).map((p) => `${PRODUCT_DIR_LABEL[p.id]}/skills/<name>/SKILL.md`),
+  ) || "skills/<name>/SKILL.md";
+  const cmd = prefs.prefs.trackClaude ? t("skills.emptyCommandsSuffix") : "";
+  return t("skills.emptyHint", { skills, commands: cmd });
 });
+
+function detailFields(id: string) {
+  return [
+    { label: t("skills.argumentHint"), value: fmOf(id, "argument-hint") },
+    { label: t("skills.model"), value: fmOf(id, "model") },
+    { label: t("skills.allowedTools"), value: fmOf(id, "allowed-tools") },
+    { label: t("skills.files"), value: byId.value.get(id)?.files },
+  ];
+}
 </script>
 
 <template>
   <ArtifactBrowser
     :items="items"
     :loading="!scan.initialized"
-    :empty-title="tab === 'skill' ? 'Скиллы не найдены' : 'Команды не найдены'"
+    :empty-title="tab === 'skill' ? t('empty.noSkills') : t('skills.emptyCommands')"
     :empty-description="emptyDescription"
   >
     <template #header>
@@ -82,7 +100,7 @@ const emptyDescription = computed(() => {
           :aria-selected="tab === 'skill'"
           @click="tab = 'skill'"
         >
-          Скиллы <span class="font-mono text-2xs text-subtle">{{ scan.skills.length }}</span>
+          {{ t("skills.skills") }} <span class="font-mono text-2xs text-subtle">{{ scan.skills.length }}</span>
         </button>
         <button
           type="button"
@@ -92,20 +110,15 @@ const emptyDescription = computed(() => {
           :aria-selected="tab === 'command'"
           @click="tab = 'command'"
         >
-          Команды <span class="font-mono text-2xs text-subtle">{{ scan.commands.length }}</span>
+          {{ t("skills.commands") }} <span class="font-mono text-2xs text-subtle">{{ scan.commands.length }}</span>
         </button>
       </div>
     </template>
     <template #detail="{ item }">
       <FieldList
         v-if="byId.get(item.id)"
-        title="Frontmatter"
-        :fields="[
-          { label: 'Подсказка аргументов', value: fmOf(item.id, 'argument-hint') },
-          { label: 'Модель', value: fmOf(item.id, 'model') },
-          { label: 'Разрешённые инструменты', value: fmOf(item.id, 'allowed-tools') },
-          { label: 'Файлы', value: byId.get(item.id)?.files },
-        ]"
+        :title="t('skills.frontmatter')"
+        :fields="detailFields(item.id)"
       />
     </template>
   </ArtifactBrowser>

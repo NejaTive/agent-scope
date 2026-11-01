@@ -1,24 +1,35 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
+import { LOCALES } from "@/i18n";
 import { usePreferencesStore } from "@/stores/preferences";
 import { useScanStore } from "@/stores/scan";
 import { useUpdatesStore } from "@/stores/updates";
 import { ipc } from "@/lib/ipc";
 import { shortenPath } from "@/lib/format";
 import { TOOLING_PROVIDERS } from "@/lib/tooling";
-import type { Preferences, ThemePreference, ToolingPresence } from "@/types/config";
+import type { AppLocale, Preferences, ThemePreference, ToolingPresence } from "@/types/config";
 import Badge from "@/components/common/Badge.vue";
 import Icon from "@/components/common/Icon.vue";
 
+const { t } = useI18n();
 const prefs = usePreferencesStore();
 const scan = useScanStore();
 const updates = useUpdatesStore();
 
-const THEMES: Array<{ value: ThemePreference; label: string }> = [
-  { value: "dark", label: "Тёмная" },
-  { value: "light", label: "Светлая" },
-  { value: "system", label: "Системная" },
-];
+const THEMES = computed(() =>
+  (["dark", "light", "system"] as ThemePreference[]).map((value) => ({
+    value,
+    label: t(`theme.${value}`),
+  })),
+);
+
+const LOCALE_OPTIONS = computed(() =>
+  LOCALES.map((value) => ({
+    value,
+    label: t(`locale.${value}`),
+  })),
+);
 
 const presence = ref<ToolingPresence>({ claude: false, cursor: false });
 
@@ -57,17 +68,17 @@ function onTrackToggle(
 const statusText = computed(() => {
   switch (updates.status) {
     case "checking":
-      return "Проверка…";
+      return t("settings.updateChecking");
     case "up-to-date":
-      return "Установлена актуальная версия";
+      return t("settings.updateUpToDate");
     case "update-available":
       return updates.latestVersion
-        ? `Доступна версия ${updates.latestVersion}`
-        : "Доступна новая версия";
+        ? t("settings.updateAvailableVersion", { version: updates.latestVersion })
+        : t("settings.updateAvailable");
     case "error":
       return updates.error
-        ? `Не удалось проверить обновления: ${updates.error}`
-        : "Не удалось проверить обновления";
+        ? t("settings.updateErrorWithDetail", { error: updates.error })
+        : t("settings.updateError");
     default:
       return null;
   }
@@ -86,6 +97,12 @@ const statusTone = computed(() => {
   }
 });
 
+const prefsBanner = computed(() => {
+  if (prefs.toolingErrorKey) return t(prefs.toolingErrorKey);
+  if (!prefs.error) return null;
+  return t("settings.syncError", { error: prefs.error });
+});
+
 async function openRelease() {
   const url = updates.releaseUrl;
   if (!url || !/^https?:/i.test(url)) return;
@@ -96,50 +113,66 @@ async function openRelease() {
     /* opener unavailable (browser dev) */
   }
 }
+
+function setLocale(locale: AppLocale) {
+  void prefs.setLocale(locale);
+}
 </script>
 
 <template>
   <div class="h-full overflow-y-auto">
     <div class="mx-auto max-w-2xl space-y-6 px-6 py-5">
       <div
-        v-if="prefs.error"
+        v-if="prefsBanner"
         class="rounded-md border border-warn/30 bg-warn/10 px-3 py-1.5 text-xs text-warn"
       >
-        {{
-          prefs.error.includes("AI-инструмент")
-            ? prefs.error
-            : `Не удалось синхронизировать настройки с бэкендом (${prefs.error}). Изменения сохранены локально.`
-        }}
+        {{ prefsBanner }}
       </div>
 
       <section>
-        <h2 class="label mb-2">Внешний вид</h2>
-        <div class="card flex items-center justify-between gap-4 px-3 py-2.5">
-          <div>
-            <div class="text-[13px] font-medium">Тема</div>
-            <div class="text-xs text-muted">
-              По умолчанию — тёмная. Системная следует за настройкой ОС.
+        <h2 class="label mb-2">{{ t("settings.appearance") }}</h2>
+        <div class="card divide-y divide-line">
+          <div class="flex items-center justify-between gap-4 px-3 py-2.5">
+            <div>
+              <div class="text-[13px] font-medium">{{ t("settings.theme") }}</div>
+              <div class="text-xs text-muted">{{ t("settings.themeHint") }}</div>
+            </div>
+            <div class="flex items-center gap-0.5 rounded-md border border-line p-0.5">
+              <button
+                v-for="th in THEMES"
+                :key="th.value"
+                type="button"
+                class="chip !h-6"
+                :class="prefs.prefs.theme === th.value && 'chip-active'"
+                @click="prefs.setTheme(th.value)"
+              >
+                {{ th.label }}
+              </button>
             </div>
           </div>
-          <div
-            class="flex items-center gap-0.5 rounded-md border border-line p-0.5"
-          >
-            <button
-              v-for="t in THEMES"
-              :key="t.value"
-              type="button"
-              class="chip !h-6"
-              :class="prefs.prefs.theme === t.value && 'chip-active'"
-              @click="prefs.setTheme(t.value)"
-            >
-              {{ t.label }}
-            </button>
+          <div class="flex items-center justify-between gap-4 px-3 py-2.5">
+            <div>
+              <div class="text-[13px] font-medium">{{ t("settings.language") }}</div>
+              <div class="text-xs text-muted">{{ t("settings.languageHint") }}</div>
+            </div>
+            <div class="flex items-center gap-0.5 rounded-md border border-line p-0.5">
+              <button
+                v-for="opt in LOCALE_OPTIONS"
+                :key="opt.value"
+                type="button"
+                class="chip !h-6"
+                :class="prefs.prefs.locale === opt.value && 'chip-active'"
+                @click="setLocale(opt.value)"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
           </div>
         </div>
       </section>
 
       <section>
-        <h2 class="label mb-2">AI-инструменты</h2>
+        <h2 class="label mb-2">{{ t("settings.tooling") }}</h2>
         <div class="card divide-y divide-line">
           <label
             v-for="provider in TOOLING_PROVIDERS"
@@ -158,12 +191,11 @@ async function openRelease() {
                   :tone="presence[provider.id] ? 'ok' : 'neutral'"
                   class="!text-2xs"
                 >
-                  {{ presence[provider.id] ? "обнаружен" : "не найден" }}
+                  {{ presence[provider.id] ? t("settings.found") : t("settings.notFound") }}
                 </Badge>
               </div>
               <div class="text-xs text-muted">
-                Включать {{ provider.label }} в сканирование и отслеживание
-                изменений.
+                {{ t("settings.toolingInclude", { label: provider.label }) }}
               </div>
             </div>
             <input
@@ -181,24 +213,22 @@ async function openRelease() {
           </label>
         </div>
         <p class="mt-1.5 text-2xs text-subtle">
-          Хотя бы один инструмент должен оставаться включённым.
+          {{ t("settings.toolingAtLeastOne") }}
         </p>
       </section>
 
       <section>
-        <h2 class="label mb-2">Сканирование</h2>
+        <h2 class="label mb-2">{{ t("settings.scanningSection") }}</h2>
         <div class="card divide-y divide-line">
           <label
             class="flex cursor-pointer items-center justify-between gap-4 px-3 py-2.5"
           >
             <div>
               <div class="text-[13px] font-medium">
-                Отслеживать изменения файлов при запуске
+                {{ t("settings.watchOnStart") }}
               </div>
               <div class="text-xs text-muted">
-                Автоматическое мягкое обновление при изменении конфигурации
-                включённых AI-инструментов на диске. Переключение сразу
-                запускает или останавливает наблюдатель.
+                {{ t("settings.watchOnStartHint") }}
               </div>
             </div>
             <input
@@ -216,10 +246,9 @@ async function openRelease() {
             class="flex cursor-pointer items-center justify-between gap-4 px-3 py-2.5"
           >
             <div>
-              <div class="text-[13px] font-medium">Уведомления</div>
+              <div class="text-[13px] font-medium">{{ t("settings.notifications") }}</div>
               <div class="text-xs text-muted">
-                Уведомлять об изменении конфигурации включённых AI-инструментов
-                на диске.
+                {{ t("settings.notificationsHint") }}
               </div>
             </div>
             <input
@@ -234,7 +263,7 @@ async function openRelease() {
             />
           </label>
           <div class="px-3 py-2.5">
-            <div class="mb-1 text-[13px] font-medium">Корни сканирования</div>
+            <div class="mb-1 text-[13px] font-medium">{{ t("settings.scanRoots") }}</div>
             <ul v-if="scan.scanRoots.length" class="space-y-0.5">
               <li
                 v-for="r in scan.scanRoots"
@@ -244,31 +273,31 @@ async function openRelease() {
                 {{ shortenPath(r.path) }}
               </li>
             </ul>
-            <p v-else class="text-xs text-muted">Не заданы.</p>
+            <p v-else class="text-xs text-muted">{{ t("settings.scanRootsEmpty") }}</p>
             <RouterLink
               to="/projects"
               class="mt-1.5 inline-block text-xs text-accent hover:underline"
             >
-              Управление на странице «Проекты» →
+              {{ t("settings.manageOnProjects") }}
             </RouterLink>
           </div>
         </div>
       </section>
 
       <section>
-        <h2 class="label mb-2">Редактирование</h2>
+        <h2 class="label mb-2">{{ t("settings.editing") }}</h2>
         <div class="card divide-y divide-line">
           <label
             class="flex cursor-pointer items-center justify-between gap-4 px-3 py-2.5"
           >
             <div>
               <div class="text-[13px] font-medium">
-                Разрешить редактирование файлов конфигурации
+                {{ t("settings.allowEditing") }}
               </div>
               <div class="text-xs text-muted">
-                Включает редактирование, переименование и удаление существующих файлов.
+                {{ t("settings.allowEditingHint") }}
                 <br />
-                <b> В режиме правки секреты не маскируются.</b>
+                <b>{{ t("settings.allowEditingSecrets") }}</b>
               </div>
             </div>
             <input
@@ -286,16 +315,16 @@ async function openRelease() {
       </section>
 
       <section>
-        <h2 class="label mb-2">О приложении</h2>
+        <h2 class="label mb-2">{{ t("settings.about") }}</h2>
         <dl
           class="card grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 px-3 py-2.5 text-xs"
         >
-          <dt class="text-subtle">Название</dt>
+          <dt class="text-subtle">{{ t("settings.name") }}</dt>
           <dd>{{ scan.appInfo?.name ?? "Agent Scope" }}</dd>
-          <dt class="text-subtle">Версия</dt>
+          <dt class="text-subtle">{{ t("settings.version") }}</dt>
           <dd class="font-mono">{{ scan.appInfo?.version ?? "0.5.0" }}</dd>
           <template v-if="prefs.prefs.trackClaude && scan.globalMeta.configDir">
-            <dt class="text-subtle">Каталог Claude Code</dt>
+            <dt class="text-subtle">{{ t("settings.claudeDir") }}</dt>
             <dd class="break-all font-mono">
               {{ shortenPath(scan.globalMeta.configDir) }}
             </dd>
@@ -303,21 +332,25 @@ async function openRelease() {
           <template
             v-if="prefs.prefs.trackCursor && scan.globalMeta.cursorConfigDir"
           >
-            <dt class="text-subtle">Каталог Cursor</dt>
+            <dt class="text-subtle">{{ t("settings.cursorDir") }}</dt>
             <dd class="break-all font-mono">
               {{ shortenPath(scan.globalMeta.cursorConfigDir) }}
             </dd>
           </template>
           <template v-if="scan.globalMeta.managedDir">
-            <dt class="text-subtle">Управляемый каталог</dt>
+            <dt class="text-subtle">{{ t("settings.managedDir") }}</dt>
             <dd class="break-all font-mono">
               {{ shortenPath(scan.globalMeta.managedDir) }}
             </dd>
           </template>
-          <dt class="text-subtle">Бэкенд</dt>
+          <dt class="text-subtle">{{ t("settings.backend") }}</dt>
           <dd>
             <Badge :tone="scan.backendAvailable ? 'ok' : 'danger'">
-              {{ scan.backendAvailable ? "подключён" : "недоступен" }}
+              {{
+                scan.backendAvailable
+                  ? t("settings.backendConnected")
+                  : t("settings.backendUnavailable")
+              }}
             </Badge>
           </dd>
         </dl>
@@ -330,7 +363,7 @@ async function openRelease() {
               @click="updates.check()"
             >
               <Icon name="refresh" :size="12" :class="updates.status === 'checking' && 'animate-spin'" />
-              Проверить обновления
+              {{ t("settings.checkUpdates") }}
             </button>
             <button
               v-if="updates.updateAvailable && updates.releaseUrl"
@@ -338,7 +371,7 @@ async function openRelease() {
               class="btn-ghost"
               @click="openRelease"
             >
-              Открыть релиз
+              {{ t("settings.openRelease") }}
             </button>
           </div>
           <p v-if="statusText" class="text-xs" :class="statusTone">{{ statusText }}</p>
@@ -346,7 +379,7 @@ async function openRelease() {
             v-if="updates.updateAvailable && scan.appInfo?.platform === 'macos'"
             class="text-2xs text-subtle"
           >
-            Через Homebrew:
+            {{ t("settings.brewHint") }}
             <code class="font-mono text-muted">brew upgrade --cask agent-scope</code>
           </p>
           <p
@@ -356,14 +389,12 @@ async function openRelease() {
             "
             class="text-2xs text-subtle"
           >
-            Скачай новый установщик с страницы релиза.
+            {{ t("settings.installerHint") }}
           </p>
         </div>
         <p class="mt-2 flex items-center gap-1.5 text-2xs text-subtle">
           <Icon name="lock" :size="11" />
-          По умолчанию — просмотр. Запись / rename / delete — opt-in и только
-          для существующих файлов из allowlist; credentials и пути вне списка не
-          трогаются.
+          {{ t("settings.defaultViewHint") }}
         </p>
       </section>
     </div>

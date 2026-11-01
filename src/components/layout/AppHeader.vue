@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { useScanStore } from "@/stores/scan";
@@ -8,13 +9,14 @@ import { useTheme } from "@/composables/useTheme";
 import { ipc } from "@/lib/ipc";
 import { KIND_LABEL, routeForKind } from "@/lib/labels";
 import { shortenPath } from "@/lib/format";
-import { RU, pluralCount } from "@/lib/plural";
+import { pluralCountLocale } from "@/lib/plural";
 import type { SearchHit } from "@/types/config";
 import Icon from "@/components/common/Icon.vue";
 import SearchInput from "@/components/common/SearchInput.vue";
 import ScopeBadge from "@/components/common/ScopeBadge.vue";
 import Badge from "@/components/common/Badge.vue";
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const scan = useScanStore();
@@ -22,18 +24,27 @@ const ui = useUiStore();
 const { search } = storeToRefs(ui);
 const theme = useTheme();
 
-const title = computed(() => (route.meta.title as string | undefined) ?? "Agent Scope");
+const title = computed(() => {
+  const key = route.meta.titleKey as string | undefined;
+  return key ? t(key) : "Agent Scope";
+});
 const searchable = computed(() => !!route.meta.searchable);
 
 const themeIcon = computed(() =>
   theme.preference.value === "dark" ? "moon" : theme.preference.value === "light" ? "sun" : "monitor",
 );
-const THEME_RU: Record<string, string> = { dark: "тёмная", light: "светлая", system: "системная" };
-const themeLabel = computed(
-  () => `Тема: ${THEME_RU[theme.preference.value] ?? theme.preference.value} (нажмите, чтобы сменить)`,
+const themeLabel = computed(() =>
+  t("theme.cycleTitle", {
+    label: t(`theme.${theme.preference.value}` as "theme.dark" | "theme.light" | "theme.system"),
+  }),
 );
 
 const changeCount = computed(() => scan.recentChanges.length);
+const changeTitle = computed(() =>
+  ui.unseenChanges
+    ? pluralCountLocale(ui.unseenChanges, "newChange")
+    : pluralCountLocale(changeCount.value, "recentChange"),
+);
 
 function openChanges() {
   ui.markChangesSeen();
@@ -79,6 +90,10 @@ function openHit(hit: SearchHit) {
   hits.value = [];
   void router.push(routeForKind(hit.kind));
 }
+
+function kindLabel(kind: SearchHit["kind"]): string {
+  return KIND_LABEL[kind] ?? kind;
+}
 </script>
 
 <template>
@@ -93,7 +108,7 @@ function openHit(hit: SearchHit) {
     <div class="relative w-72">
       <SearchInput
         v-model="search"
-        :placeholder="searchable ? 'Поиск…' : 'Поиск по артефактам…'"
+        :placeholder="searchable ? t('common.search') : t('header.searchArtifacts')"
         @focus="focused = true"
         @blur="focused = false"
       />
@@ -101,7 +116,9 @@ function openHit(hit: SearchHit) {
         v-if="showDropdown"
         class="absolute left-0 right-0 top-8 z-30 overflow-hidden rounded-md border border-line bg-surface shadow-lg shadow-black/30"
       >
-        <div v-if="searching && !hits.length" class="px-3 py-2 text-xs text-muted">Поиск…</div>
+        <div v-if="searching && !hits.length" class="px-3 py-2 text-xs text-muted">
+          {{ t("header.searching") }}
+        </div>
         <button
           v-for="hit in hits"
           :key="hit.id"
@@ -111,7 +128,7 @@ function openHit(hit: SearchHit) {
         >
           <span class="flex items-center gap-1.5">
             <span class="truncate text-xs font-medium">{{ hit.name }}</span>
-            <Badge>{{ KIND_LABEL[hit.kind] ?? hit.kind }}</Badge>
+            <Badge>{{ kindLabel(hit.kind) }}</Badge>
             <ScopeBadge :scope="hit.scope" />
           </span>
           <span class="truncate font-mono text-2xs text-subtle">{{ shortenPath(hit.path) }}</span>
@@ -123,11 +140,7 @@ function openHit(hit: SearchHit) {
       <button
         type="button"
         class="btn-ghost relative"
-        :title="
-          ui.unseenChanges
-            ? pluralCount(ui.unseenChanges, RU.newChange)
-            : pluralCount(changeCount, RU.recentChange)
-        "
+        :title="changeTitle"
         @click="openChanges"
       >
         <Icon name="activity" :size="14" />
@@ -142,11 +155,11 @@ function openHit(hit: SearchHit) {
         type="button"
         class="btn"
         :disabled="scan.scanning"
-        title="Пересканировать конфигурацию"
+        :title="t('header.rescanTitle')"
         @click="scan.refresh()"
       >
         <Icon name="refresh" :size="13" :class="scan.scanning && 'animate-spin'" />
-        Обновить
+        {{ t("common.refresh") }}
       </button>
 
       <button type="button" class="btn-ghost !px-1.5" :title="themeLabel" @click="theme.cycle()">

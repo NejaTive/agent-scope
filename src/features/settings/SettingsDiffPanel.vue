@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useInvoke } from "@/composables/useInvoke";
 import { matchesQuery } from "@/composables/useSearch";
 import { ipc } from "@/lib/ipc";
 import { formatValue, shortenPath } from "@/lib/format";
-import { RU, pluralCount } from "@/lib/plural";
+import { pluralCountLocale } from "@/lib/plural";
 import { maskIfSecret } from "@/lib/secrets";
 import type { SettingsDiff, SettingsDiffRow } from "@/types/config";
 import { useScanStore } from "@/stores/scan";
@@ -14,12 +15,20 @@ import LoadingBlock from "@/components/common/LoadingBlock.vue";
 
 const props = defineProps<{ projectPath: string; query?: string }>();
 
+const { t } = useI18n();
+
 type Column = "user" | "project" | "local";
-const COLUMNS: Array<{ key: Column; label: string; pathKey: keyof SettingsDiff }> = [
-  { key: "user", label: "Пользователь", pathKey: "userPath" },
-  { key: "project", label: "Проект", pathKey: "projectSettingsPath" },
-  { key: "local", label: "Локальный", pathKey: "localPath" },
-];
+
+const columns = computed(() => [
+  { key: "user" as const, label: t("settingsDiff.user"), pathKey: "userPath" as keyof SettingsDiff },
+  {
+    key: "project" as const,
+    label: t("settingsDiff.project"),
+    pathKey: "projectSettingsPath" as keyof SettingsDiff,
+  },
+  { key: "local" as const, label: t("settingsDiff.local"), pathKey: "localPath" as keyof SettingsDiff },
+]);
+
 /** Highest precedence first (managed is not part of the diff). */
 const PRECEDENCE: Column[] = ["local", "project", "user"];
 
@@ -38,6 +47,7 @@ const rows = computed<SettingsDiffRow[]>(() =>
     .sort((a, b) => Number(b.differs) - Number(a.differs) || a.key.localeCompare(b.key)),
 );
 const totalRows = computed(() => diff.data.value?.rows.length ?? 0);
+const keyCountLabel = computed(() => pluralCountLocale(rows.value.length, "key"));
 
 const has = (v: unknown) => v !== undefined && v !== null;
 
@@ -51,7 +61,7 @@ function winner(r: SettingsDiffRow): Column | null {
   return PRECEDENCE.find((c) => has(r[c])) ?? null;
 }
 
-function columnPath(c: (typeof COLUMNS)[number]): string | null {
+function columnPath(c: (typeof columns.value)[number]): string | null {
   const p = diff.data.value?.[c.pathKey];
   return typeof p === "string" ? p : null;
 }
@@ -60,26 +70,26 @@ function columnPath(c: (typeof COLUMNS)[number]): string | null {
 <template>
   <section>
     <div class="mb-2 flex items-center gap-2">
-      <h2 class="label">Diff настроек по областям</h2>
-      <span class="font-mono text-2xs text-subtle">{{ pluralCount(rows.length, RU.key) }}</span>
+      <h2 class="label">{{ t("settingsDiff.title") }}</h2>
+      <span class="font-mono text-2xs text-subtle">{{ keyCountLabel }}</span>
     </div>
     <LoadingBlock v-if="diff.loading.value && !diff.data.value" :lines="4" />
     <div v-else-if="diff.error.value" class="card h-40">
-      <EmptyState compact tone="danger" title="Не удалось вычислить diff настроек" :description="diff.error.value" />
+      <EmptyState compact tone="danger" :title="t('settingsDiff.failed')" :description="diff.error.value" />
     </div>
     <div v-else-if="!rows.length" class="card h-32">
       <EmptyState
         compact
-        :title="totalRows ? 'Нет подходящих ключей' : 'Нет настроек для сравнения'"
-        :description="totalRows ? 'Измените поиск.' : 'Для этого проекта нет ключей в пользовательских, проектных или локальных настройках.'"
+        :title="totalRows ? t('settingsDiff.noMatching') : t('settingsDiff.none')"
+        :description="totalRows ? t('settingsDiff.filterHint') : t('settingsDiff.emptyHint')"
       />
     </div>
     <div v-else class="card overflow-x-auto">
       <table class="w-full border-collapse text-xs">
         <thead>
           <tr class="border-b border-line">
-            <th class="th">Ключ</th>
-            <th v-for="c in COLUMNS" :key="c.key" class="th">
+            <th class="th">{{ t("settingsDiff.key") }}</th>
+            <th v-for="c in columns" :key="c.key" class="th">
               {{ c.label }}
               <span
                 v-if="columnPath(c)"
@@ -89,25 +99,27 @@ function columnPath(c: (typeof COLUMNS)[number]): string | null {
                 {{ shortenPath(columnPath(c)!) }}
               </span>
             </th>
-            <th class="th">Статус</th>
+            <th class="th">{{ t("settingsDiff.status") }}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-line">
           <tr v-for="r in rows" :key="r.key">
             <td class="td whitespace-nowrap font-mono text-[11.5px]">{{ r.key }}</td>
-            <td v-for="c in COLUMNS" :key="c.key" class="td max-w-[260px]">
+            <td v-for="c in columns" :key="c.key" class="td max-w-[260px]">
               <span
                 v-if="cell(r, c.key) !== null"
                 class="block break-all font-mono text-[11.5px]"
                 :class="r.differs && winner(r) === c.key ? 'text-accent' : 'text-muted'"
-                :title="r.differs && winner(r) === c.key ? 'Победившее значение' : undefined"
+                :title="r.differs && winner(r) === c.key ? t('settingsDiff.winningValue') : undefined"
               >
                 {{ cell(r, c.key) }}
               </span>
-              <span v-else class="text-subtle">—</span>
+              <span v-else class="text-subtle">{{ t("common.emDash") }}</span>
             </td>
             <td class="td">
-              <Badge :tone="r.differs ? 'warn' : 'neutral'">{{ r.differs ? "отличается" : "совпадает" }}</Badge>
+              <Badge :tone="r.differs ? 'warn' : 'neutral'">
+                {{ r.differs ? t("settingsDiff.differs") : t("settingsDiff.matches") }}
+              </Badge>
             </td>
           </tr>
         </tbody>

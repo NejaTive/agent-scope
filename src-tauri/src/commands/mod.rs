@@ -497,6 +497,9 @@ pub fn set_preferences(prefs: Preferences, state: State<'_, AppState>) -> Result
     if !matches!(prefs.theme.as_str(), "light" | "dark" | "system") {
         return Err(AppError::Other(format!("unknown theme `{}`", prefs.theme)));
     }
+    if !matches!(prefs.locale.as_str(), "ru" | "en") {
+        return Err(AppError::Other(format!("unknown locale `{}`", prefs.locale)));
+    }
     ToolingFilter::validate_prefs(&prefs)?;
     let track_changed = {
         let db = state.db.lock();

@@ -1,3 +1,5 @@
+import { tr } from "@/i18n";
+
 export type SettingsCategory =
   | "General"
   | "Permissions"
@@ -19,16 +21,33 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   "Other",
 ];
 
-export const CATEGORY_LABEL: Record<SettingsCategory, string> = {
-  General: "Общие",
-  Permissions: "Права доступа",
-  Environment: "Окружение",
-  Hooks: "Хуки",
-  Model: "Модель",
-  MCP: "Связанные с MCP",
-  Plugins: "Плагины",
-  Other: "Прочее",
+const CATEGORY_I18N: Record<SettingsCategory, string> = {
+  General: "category.general",
+  Permissions: "category.permissions",
+  Environment: "category.environment",
+  Hooks: "category.hooks",
+  Model: "category.model",
+  MCP: "category.mcp",
+  Plugins: "category.plugins",
+  Other: "category.other",
 };
+
+function categoryLabel(cat: SettingsCategory): string {
+  return tr(CATEGORY_I18N[cat]);
+}
+
+/** Locale-aware category labels (access resolves via vue-i18n). */
+export const CATEGORY_LABEL: Record<SettingsCategory, string> = (() => {
+  const out = {} as Record<SettingsCategory, string>;
+  for (const cat of SETTINGS_CATEGORIES) {
+    Object.defineProperty(out, cat, {
+      enumerable: true,
+      configurable: true,
+      get: () => categoryLabel(cat),
+    });
+  }
+  return out;
+})();
 
 const BY_KEY: Record<string, SettingsCategory> = {
   // general

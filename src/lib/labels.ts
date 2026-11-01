@@ -1,3 +1,4 @@
+import { tr } from "@/i18n";
 import type {
   ArtifactKind,
   DiscoveryStatus,
@@ -24,15 +25,61 @@ export function resolveProduct(product?: Product | null): Product {
   return product === "cursor" ? "cursor" : "claude";
 }
 
-export const SCOPE_LABEL: Record<Scope, string> = {
-  managed: "Управляемый",
-  user: "Пользователь",
-  project: "Проект",
-  projectLocal: "Локальный",
-  plugin: "Плагин",
-  nested: "Вложенный",
-  globalConfig: "Глобальные",
-};
+/** Locale-aware record: each access resolves via vue-i18n. */
+function i18nRecord<K extends string>(
+  keys: readonly K[],
+  toKey: (k: K) => string,
+): Record<K, string> {
+  const out = {} as Record<K, string>;
+  for (const k of keys) {
+    Object.defineProperty(out, k, {
+      enumerable: true,
+      configurable: true,
+      get: () => tr(toKey(k)),
+    });
+  }
+  return out;
+}
+
+const SCOPE_KEYS = [
+  "managed",
+  "user",
+  "project",
+  "projectLocal",
+  "plugin",
+  "nested",
+  "globalConfig",
+] as const satisfies readonly Scope[];
+
+const KIND_KEYS = [
+  "skill",
+  "command",
+  "rule",
+  "agent",
+  "hook",
+  "mcpServer",
+  "plugin",
+  "settings",
+  "memory",
+  "claudeMd",
+  "workflow",
+  "outputStyle",
+  "other",
+] as const satisfies readonly ArtifactKind[];
+
+const STATUS_KEYS = [
+  "present",
+  "missing",
+  "unreadable",
+  "invalidJson",
+  "invalidFrontmatter",
+  "partial",
+] as const satisfies readonly DiscoveryStatus[];
+
+export const SCOPE_LABEL: Record<Scope, string> = i18nRecord(
+  SCOPE_KEYS,
+  (k) => `labels.scope.${k}`,
+);
 
 export const SCOPE_ORDER: Scope[] = [
   "managed",
@@ -55,46 +102,20 @@ export const SCOPE_PRECEDENCE: Record<Scope, number> = {
   globalConfig: 0,
 };
 
-export const KIND_LABEL: Record<ArtifactKind, string> = {
-  skill: "Скилл",
-  command: "Команда",
-  rule: "Правило",
-  agent: "Агент",
-  hook: "Хук",
-  mcpServer: "MCP-сервер",
-  plugin: "Плагин",
-  settings: "Настройки",
-  memory: "Память",
-  claudeMd: "CLAUDE.md",
-  workflow: "Воркфлоу",
-  outputStyle: "Стиль вывода",
-  other: "Прочее",
-};
+export const KIND_LABEL: Record<ArtifactKind, string> = i18nRecord(
+  KIND_KEYS,
+  (k) => `labels.kind.${k}`,
+);
 
-export const KIND_PLURAL: Record<ArtifactKind, string> = {
-  skill: "Скиллы",
-  command: "Команды",
-  rule: "Правила",
-  agent: "Агенты",
-  hook: "Хуки",
-  mcpServer: "MCP-серверы",
-  plugin: "Плагины",
-  settings: "Настройки",
-  memory: "Память",
-  claudeMd: "CLAUDE.md",
-  workflow: "Воркфлоу",
-  outputStyle: "Стили вывода",
-  other: "Прочее",
-};
+export const KIND_PLURAL: Record<ArtifactKind, string> = i18nRecord(
+  KIND_KEYS,
+  (k) => `labels.kindPlural.${k}`,
+);
 
-export const STATUS_LABEL: Record<DiscoveryStatus, string> = {
-  present: "Найден",
-  missing: "Отсутствует",
-  unreadable: "Нечитаемый",
-  invalidJson: "Невалидный JSON",
-  invalidFrontmatter: "Невалидный frontmatter",
-  partial: "Частичный",
-};
+export const STATUS_LABEL: Record<DiscoveryStatus, string> = i18nRecord(
+  STATUS_KEYS,
+  (k) => `labels.discovery.${k}`,
+);
 
 export const STATUS_TONE: Record<
   DiscoveryStatus,

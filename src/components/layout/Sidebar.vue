@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute } from "vue-router";
 import { useScanStore } from "@/stores/scan";
 import { useUpdatesStore } from "@/stores/updates";
@@ -9,13 +10,14 @@ import StatusDot from "@/components/common/StatusDot.vue";
 
 interface NavItem {
   to: string;
-  label: string;
+  labelKey: string;
   icon: IconName;
   count?: number;
   /** Route names/prefixes that keep this item highlighted. */
   match?: string;
 }
 
+const { t } = useI18n();
 const scan = useScanStore();
 const updates = useUpdatesStore();
 const route = useRoute();
@@ -23,18 +25,24 @@ const route = useRoute();
 const main = computed<NavItem[]>(() => {
   const d = scan.dashboard;
   return [
-    { to: "/", label: "Обзор", icon: "dashboard" },
-    { to: "/global", label: "Глобальные", icon: "globe" },
-    { to: "/projects", label: "Проекты", icon: "folder", count: d.projectCount, match: "/projects" },
-    { to: "/skills", label: "Скиллы", icon: "zap", count: scan.skillEntries.length },
-    { to: "/rules", label: "Правила", icon: "file-text", count: d.rules },
-    { to: "/agents", label: "Агенты", icon: "bot", count: d.agents },
-    { to: "/hooks", label: "Хуки", icon: "link", count: d.hooks },
-    { to: "/mcp", label: "MCP-серверы", icon: "server", count: d.mcpServers },
-    { to: "/plugins", label: "Плагины", icon: "box", count: d.plugins },
-    { to: "/permissions", label: "Права доступа", icon: "shield" },
-    { to: "/settings", label: "Настройки", icon: "sliders" },
-    { to: "/memory", label: "Память", icon: "database" },
+    { to: "/", labelKey: "nav.overview", icon: "dashboard" },
+    { to: "/global", labelKey: "nav.global", icon: "globe" },
+    {
+      to: "/projects",
+      labelKey: "nav.projects",
+      icon: "folder",
+      count: d.projectCount,
+      match: "/projects",
+    },
+    { to: "/skills", labelKey: "nav.skills", icon: "zap", count: scan.skillEntries.length },
+    { to: "/rules", labelKey: "nav.rules", icon: "file-text", count: d.rules },
+    { to: "/agents", labelKey: "nav.agents", icon: "bot", count: d.agents },
+    { to: "/hooks", labelKey: "nav.hooks", icon: "link", count: d.hooks },
+    { to: "/mcp", labelKey: "nav.mcp", icon: "server", count: d.mcpServers },
+    { to: "/plugins", labelKey: "nav.plugins", icon: "box", count: d.plugins },
+    { to: "/permissions", labelKey: "nav.permissions", icon: "shield" },
+    { to: "/settings", labelKey: "nav.settings", icon: "sliders" },
+    { to: "/memory", labelKey: "nav.memory", icon: "database" },
   ];
 });
 
@@ -44,15 +52,17 @@ function isActive(item: NavItem): boolean {
 }
 
 const status = computed(() => {
-  if (scan.scanning) return { tone: "accent" as const, pulse: true, text: "Сканирование…" };
+  if (scan.scanning) return { tone: "accent" as const, pulse: true, text: t("status.scanning") };
   if (scan.error && !scan.backendAvailable)
-    return { tone: "danger" as const, pulse: false, text: "Бэкенд недоступен" };
-  if (scan.error) return { tone: "warn" as const, pulse: false, text: "Последнее сканирование не удалось" };
-  if (!scan.initialized) return { tone: "neutral" as const, pulse: true, text: "Запуск…" };
+    return { tone: "danger" as const, pulse: false, text: t("status.backendUnavailable") };
+  if (scan.error)
+    return { tone: "warn" as const, pulse: false, text: t("status.lastScanFailed") };
+  if (!scan.initialized)
+    return { tone: "neutral" as const, pulse: true, text: t("status.starting") };
   return {
     tone: "ok" as const,
     pulse: false,
-    text: `Сканировано ${relativeTime(scan.lastScanAt)}`,
+    text: t("status.scannedAt", { time: relativeTime(scan.lastScanAt) }),
   };
 });
 </script>
@@ -71,7 +81,7 @@ const status = computed(() => {
       </div>
     </div>
 
-    <nav class="flex-1 space-y-px overflow-y-auto px-2 pb-2" aria-label="Разделы">
+    <nav class="flex-1 space-y-px overflow-y-auto px-2 pb-2" :aria-label="t('nav.sectionsAria')">
       <RouterLink
         v-for="item in main"
         :key="item.to"
@@ -88,7 +98,7 @@ const status = computed(() => {
           :size="15"
           :class="isActive(item) ? 'text-accent' : 'text-subtle group-hover:text-muted'"
         />
-        <span class="flex-1 truncate">{{ item.label }}</span>
+        <span class="flex-1 truncate">{{ t(item.labelKey) }}</span>
         <span
           v-if="item.count"
           class="font-mono text-2xs tabular-nums"
@@ -110,23 +120,29 @@ const status = computed(() => {
         "
       >
         <Icon name="settings" :size="15" class="text-subtle" />
-        Настройки приложения
+        {{ t("nav.appSettings") }}
       </RouterLink>
       <RouterLink
         v-if="updates.updateAvailable && updates.latestVersion"
         to="/app-settings"
         class="mx-0.5 flex h-6 items-center gap-1.5 truncate rounded-md bg-accent/10 px-2 text-2xs text-accent transition-colors hover:bg-accent/15"
-        :title="`Доступна версия ${updates.latestVersion}`"
+        :title="t('settings.updateAvailableVersion', { version: updates.latestVersion })"
       >
         <Icon name="inbox" :size="11" class="shrink-0" />
-        <span class="truncate">Обновление {{ updates.latestVersion }}</span>
+        <span class="truncate"
+          >{{ t("settings.updateAvailable") }} {{ updates.latestVersion }}</span
+        >
       </RouterLink>
       <div class="flex items-center justify-between gap-2 px-2 pt-1.5 text-2xs text-subtle">
         <span class="flex min-w-0 items-center gap-1.5" :title="scan.error ?? undefined">
           <StatusDot :tone="status.tone" :pulse="status.pulse" />
           <span class="truncate">{{ status.text }}</span>
         </span>
-        <RouterLink to="/app-settings" class="font-mono hover:text-fg" title="Настройки приложения">
+        <RouterLink
+          to="/app-settings"
+          class="font-mono hover:text-fg"
+          :title="t('nav.appSettings')"
+        >
           v{{ scan.appInfo?.version ?? "0.5.0" }}
         </RouterLink>
       </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { storeToRefs } from "pinia";
 import { useSettingsDocs } from "@/composables/useSettingsDocs";
 import { matchesQuery } from "@/composables/useSearch";
@@ -24,6 +25,7 @@ interface PermRow {
   source: string;
 }
 
+const { t } = useI18n();
 const scan = useScanStore();
 const { search } = storeToRefs(useUiStore());
 const { docs, loading } = useSettingsDocs();
@@ -39,11 +41,11 @@ const rows = computed<PermRow[]>(() => {
     const p = perms as Record<string, unknown>;
     const source = d.artifact.path;
     const scope = d.artifact.scope;
-    for (const t of ["deny", "ask", "allow"] as const) {
-      const list = p[t];
+    for (const rt of ["deny", "ask", "allow"] as const) {
+      const list = p[rt];
       if (!Array.isArray(list)) continue;
       list.forEach((rule, i) =>
-        out.push({ key: `${source}:${t}:${i}`, type: t, rule: formatValue(rule), scope, source }),
+        out.push({ key: `${source}:${rt}:${i}`, type: rt, rule: formatValue(rule), scope, source }),
       );
     }
     for (const [k, v] of Object.entries(p)) {
@@ -78,6 +80,10 @@ const typeCounts = computed(() => {
 });
 const scopes = computed(() => SCOPE_ORDER.filter((s) => rows.value.some((r) => r.scope === s)));
 const parseErrors = computed(() => docs.value.filter((d) => d.error));
+
+function typeLabel(rt: RuleType): string {
+  return rt === "setting" ? t("permissions.modeAndDirs") : rt;
+}
 </script>
 
 <template>
@@ -86,23 +92,23 @@ const parseErrors = computed(() => docs.value.filter((d) => d.error));
       <ProjectSelect />
       <div class="flex items-center gap-0.5">
         <button type="button" class="chip" :class="typeFilter === 'all' && 'chip-active'" @click="typeFilter = 'all'">
-          Все <span class="font-mono text-2xs text-subtle">{{ rows.length }}</span>
+          {{ t("permissions.all") }} <span class="font-mono text-2xs text-subtle">{{ rows.length }}</span>
         </button>
         <button
-          v-for="t in (['deny', 'ask', 'allow', 'setting'] as const)"
-          :key="t"
+          v-for="rt in (['deny', 'ask', 'allow', 'setting'] as const)"
+          :key="rt"
           type="button"
           class="chip capitalize"
-          :class="typeFilter === t && 'chip-active'"
-          @click="typeFilter = t"
+          :class="typeFilter === rt && 'chip-active'"
+          @click="typeFilter = rt"
         >
-          {{ t === "setting" ? "Режим и каталоги" : t }}
-          <span class="font-mono text-2xs text-subtle">{{ typeCounts[t] }}</span>
+          {{ typeLabel(rt) }}
+          <span class="font-mono text-2xs text-subtle">{{ typeCounts[rt] }}</span>
         </button>
       </div>
       <div class="flex items-center gap-0.5">
         <button type="button" class="chip" :class="scopeFilter === 'all' && 'chip-active'" @click="scopeFilter = 'all'">
-          Все области
+          {{ t("permissions.allScopes") }}
         </button>
         <button
           v-for="s in scopes"
@@ -122,7 +128,7 @@ const parseErrors = computed(() => docs.value.filter((d) => d.error));
       :key="d.artifact.id"
       class="shrink-0 border-b border-warn/30 bg-warn/10 px-4 py-1 text-xs text-warn"
     >
-      Не удалось разобрать {{ shortenPath(d.artifact.path) }}: {{ d.error }}
+      {{ t("permissions.parseError", { path: shortenPath(d.artifact.path), error: d.error }) }}
     </div>
 
     <div class="min-h-0 flex-1 overflow-auto">
@@ -130,20 +136,16 @@ const parseErrors = computed(() => docs.value.filter((d) => d.error));
       <EmptyState
         v-else-if="!filtered.length"
         icon="shield"
-        :title="rows.length ? 'Нет подходящих прав' : 'Правила прав доступа не найдены'"
-        :description="
-          rows.length
-            ? 'Измените фильтры или поиск.'
-            : 'Ни один файл настроек не задаёт ключ `permissions` в выбранных областях.'
-        "
+        :title="rows.length ? t('permissions.noMatching') : t('permissions.noneFound')"
+        :description="rows.length ? t('permissions.filterHint') : t('permissions.emptyHint')"
       />
       <table v-else class="w-full border-collapse text-xs">
         <thead>
           <tr class="border-b border-line">
-            <th class="th w-20">Тип</th>
-            <th class="th">Правило</th>
-            <th class="th w-24">Область</th>
-            <th class="th">Исходный файл</th>
+            <th class="th w-20">{{ t("permissions.type") }}</th>
+            <th class="th">{{ t("permissions.rule") }}</th>
+            <th class="th w-24">{{ t("permissions.scope") }}</th>
+            <th class="th">{{ t("permissions.sourceFile") }}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-line">

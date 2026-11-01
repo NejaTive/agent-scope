@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute } from "vue-router";
 import { storeToRefs } from "pinia";
 import { usePreferencesStore } from "@/stores/preferences";
@@ -7,14 +8,15 @@ import { useScanStore } from "@/stores/scan";
 import { useUiStore } from "@/stores/ui";
 import { artifactToItem, type BrowserItem } from "@/lib/browser";
 import { shortenPath } from "@/lib/format";
-import { resolveProduct } from "@/lib/labels";
-import { isProductTracked, trackedDirLabels } from "@/lib/tooling";
+import { PRODUCT_DIR_LABEL, resolveProduct } from "@/lib/labels";
+import { isProductTracked, trackedProviders } from "@/lib/tooling";
 import ArtifactBrowser from "@/components/common/ArtifactBrowser.vue";
 import ProductBadge from "@/components/common/ProductBadge.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import Icon from "@/components/common/Icon.vue";
 import SettingsDiffPanel from "@/features/settings/SettingsDiffPanel.vue";
 
+const { t } = useI18n();
 const route = useRoute();
 const scan = useScanStore();
 const prefs = usePreferencesStore();
@@ -78,8 +80,10 @@ const items = computed<BrowserItem[]>(() => {
 });
 
 const emptyInventoryDescription = computed(() => {
-  const dirs = trackedDirLabels(prefs.prefs);
-  return `В этом проекте не найдены каталоги ${dirs}, CLAUDE.md, AGENTS.md или .mcp.json.`;
+  const dirs = trackedProviders(prefs.prefs)
+    .map((p) => PRODUCT_DIR_LABEL[p.id])
+    .join(" / ");
+  return t("projects.noConfigHint", { dirs: dirs || t("global.emptyRootsFallback") });
 });
 </script>
 
@@ -87,16 +91,16 @@ const emptyInventoryDescription = computed(() => {
   <div v-if="!project" class="h-full">
     <EmptyState
       icon="folder"
-      title="Проект не найден"
-      description="Этот проект больше не в списке проектов приложения."
+      :title="t('projects.notFound')"
+      :description="t('projects.notFoundHint')"
     >
-      <RouterLink to="/projects" class="btn">К проектам</RouterLink>
+      <RouterLink to="/projects" class="btn">{{ t("projects.backToProjects") }}</RouterLink>
     </EmptyState>
   </div>
 
   <div v-else class="flex h-full min-h-0 flex-col">
     <div class="flex shrink-0 items-center gap-3 border-b border-line px-4 py-2">
-      <RouterLink to="/projects" class="btn-ghost !px-1.5" title="К проектам">
+      <RouterLink to="/projects" class="btn-ghost !px-1.5" :title="t('projects.backToProjects')">
         <Icon name="chevron-right" :size="14" class="rotate-180" />
       </RouterLink>
       <div class="min-w-0 flex-1">
@@ -123,10 +127,10 @@ const emptyInventoryDescription = computed(() => {
       </div>
       <div class="flex items-center gap-0.5" role="tablist">
         <button type="button" class="chip" :class="tab === 'inventory' && 'chip-active'" @click="tab = 'inventory'">
-          Инвентарь <span class="font-mono text-2xs text-subtle">{{ items.length }}</span>
+          {{ t("projects.inventory") }} <span class="font-mono text-2xs text-subtle">{{ items.length }}</span>
         </button>
         <button type="button" class="chip" :class="tab === 'diff' && 'chip-active'" @click="tab = 'diff'">
-          Diff настроек
+          {{ t("projects.settingsDiff") }}
         </button>
       </div>
     </div>
@@ -137,7 +141,7 @@ const emptyInventoryDescription = computed(() => {
         :items="items"
         :loading="!scan.initialized"
         kind-filter
-        empty-title="Нет проектной конфигурации"
+        :empty-title="t('projects.noConfig')"
         :empty-description="emptyInventoryDescription"
       />
       <div v-else class="h-full overflow-y-auto">

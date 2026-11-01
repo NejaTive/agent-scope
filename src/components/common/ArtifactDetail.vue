@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { ipc } from "@/lib/ipc";
 import { errMsg, normalizeContent } from "@/lib/normalize";
 import { extname, formatTime, shortenPath } from "@/lib/format";
@@ -28,8 +29,11 @@ const props = withDefaults(
     collapsedContent?: boolean;
     contentLabel?: string;
   }>(),
-  { collapsedContent: false, contentLabel: "Содержимое файла" },
+  { collapsedContent: false, contentLabel: undefined },
 );
+
+const { t } = useI18n();
+const resolvedContentLabel = computed(() => props.contentLabel ?? t("artifact.contentLabel"));
 
 const scan = useScanStore();
 const prefs = usePreferencesStore();
@@ -112,16 +116,16 @@ function localizeEditError(e: unknown): string {
   const msg = errMsg(e);
   const lower = msg.toLowerCase();
   if (lower.includes("conflict") || lower.includes("changed on disk")) {
-    return "Файл изменился на диске. Перезагрузите и сохраните снова.";
+    return t("artifact.errorConflict");
   }
   if (lower.includes("editing is disabled") || lower.includes("allowediting")) {
-    return "Редактирование выключено в настройках приложения.";
+    return t("artifact.errorEditingDisabled");
   }
   if (lower.includes("json") || lower.includes("expected") || lower.includes("eof")) {
-    return `Некорректный JSON: ${msg}`;
+    return t("artifact.errorJson", { msg });
   }
   if (lower.includes("access denied") || lower.includes("not writable") || lower.includes("credentials")) {
-    return `Запись запрещена: ${msg}`;
+    return t("artifact.errorAccessDenied", { msg });
   }
   return msg;
 }
@@ -144,7 +148,7 @@ async function load() {
 
 function confirmLeaveDirty(): boolean {
   if (!dirty.value) return true;
-  return window.confirm("Есть несохранённые изменения. Уйти без сохранения?");
+  return window.confirm(t("artifact.leaveDirty"));
 }
 
 async function startEdit() {
@@ -247,7 +251,7 @@ async function confirmRename() {
     return;
   }
   if (/[/\\]/.test(trimmed)) {
-    editError.value = "Имя файла не должно содержать путь.";
+    editError.value = t("artifact.invalidName");
     pendingRename.value = false;
     return;
   }
@@ -324,6 +328,9 @@ const kindLabel = computed(() =>
   props.item.kind ? (KIND_LABEL[props.item.kind as keyof typeof KIND_LABEL] ?? props.item.kind) : null,
 );
 const status = computed(() => props.item.status ?? "present");
+const deleteDescription = computed(() =>
+  t("artifact.deleteDesc", { path: contentPath.value }),
+);
 </script>
 
 <template>
@@ -344,9 +351,9 @@ const status = computed(() => props.item.status ?? "present");
         <span
           v-if="!allowEditing"
           class="ml-auto flex items-center gap-1 text-2xs text-subtle"
-          title="По умолчанию только просмотр. Запись существующих файлов из allowlist включается в настройках приложения."
+          :title="t('artifact.viewOnlyTitle')"
         >
-          <Icon name="lock" :size="11" /> только просмотр
+          <Icon name="lock" :size="11" /> {{ t("artifact.viewOnly") }}
         </span>
         <div v-else class="relative ml-auto flex items-center gap-2" ref="actionsRoot">
           <template v-if="editing">
@@ -356,7 +363,7 @@ const status = computed(() => props.item.status ?? "present");
               :disabled="saving"
               @click="cancelEdit"
             >
-              Отмена
+              {{ t("common.cancel") }}
             </button>
             <button
               type="button"
@@ -364,7 +371,7 @@ const status = computed(() => props.item.status ?? "present");
               :disabled="saving || !dirty"
               @click="saveEdit"
             >
-              {{ saving ? "Сохранение…" : "Сохранить" }}
+              {{ saving ? t("common.saving") : t("common.save") }}
             </button>
           </template>
           <template v-else-if="canEdit">
@@ -374,7 +381,7 @@ const status = computed(() => props.item.status ?? "present");
               :disabled="editLoading || loading || saving"
               :aria-expanded="actionsOpen"
               aria-haspopup="menu"
-              title="Действия"
+              :title="t('artifact.actions')"
               @click="toggleActions"
             >
               <Icon name="more" :size="16" class="block" />
@@ -391,7 +398,7 @@ const status = computed(() => props.item.status ?? "present");
                 :disabled="editLoading || loading || saving"
                 @click="closeActions(); startEdit()"
               >
-                {{ editLoading ? "Загрузка…" : "Изменить" }}
+                {{ editLoading ? t("common.loading") : t("artifact.modify") }}
               </button>
               <button
                 type="button"
@@ -400,7 +407,7 @@ const status = computed(() => props.item.status ?? "present");
                 :disabled="loading || saving"
                 @click="closeActions(); requestRename()"
               >
-                Переименовать
+                {{ t("common.rename") }}
               </button>
               <button
                 v-if="undoPrevious != null"
@@ -410,7 +417,7 @@ const status = computed(() => props.item.status ?? "present");
                 :disabled="saving"
                 @click="closeActions(); undoLastSave()"
               >
-                Отменить сохранение
+                {{ t("artifact.undoSave") }}
               </button>
               <div class="my-1 border-t border-line" />
               <button
@@ -420,7 +427,7 @@ const status = computed(() => props.item.status ?? "present");
                 :disabled="loading || saving"
                 @click="closeActions(); requestDelete()"
               >
-                Удалить
+                {{ t("common.delete") }}
               </button>
             </div>
           </template>
@@ -428,17 +435,17 @@ const status = computed(() => props.item.status ?? "present");
       </div>
       <p v-if="item.subtitle" class="text-xs text-muted">{{ item.subtitle }}</p>
       <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-0.5 text-xs">
-        <dt class="text-subtle">Путь</dt>
+        <dt class="text-subtle">{{ t("artifact.path") }}</dt>
         <dd class="break-all font-mono text-[11.5px] text-muted" :title="item.path">
           {{ shortenPath(item.path) }}
         </dd>
         <template v-if="item.projectPath">
-          <dt class="text-subtle">Проект</dt>
+          <dt class="text-subtle">{{ t("artifact.project") }}</dt>
           <dd class="break-all font-mono text-[11.5px] text-muted">
             {{ shortenPath(item.projectPath) }}
           </dd>
         </template>
-        <dt class="text-subtle">Изменён</dt>
+        <dt class="text-subtle">{{ t("artifact.modified") }}</dt>
         <dd class="text-muted">{{ formatTime(item.mtime) }}</dd>
       </dl>
     </div>
@@ -466,15 +473,14 @@ const status = computed(() => props.item.status ?? "present");
             :class="showContent && 'rotate-90'"
             class="transition-transform"
           />
-          {{ contentLabel }}
+          {{ resolvedContentLabel }}
         </button>
 
         <template v-if="editing">
           <div
             class="mb-2 rounded-md border border-warn/30 bg-warn/10 px-3 py-1.5 text-xs text-warn"
           >
-            В режиме редактирования секреты не маскируются. Не сохраняйте содержимое из режима просмотра
-            с масками <span class="font-mono">***</span>.
+            {{ t("artifact.editSecretsWarning") }}
           </div>
           <textarea
             v-model="draft"
@@ -488,14 +494,14 @@ const status = computed(() => props.item.status ?? "present");
           <EmptyState
             v-else-if="item.status === 'missing'"
             compact
-            title="Файл не найден"
-            description="Файл был обнаружен ранее, но больше не существует на диске."
+            :title="t('artifact.missingTitle')"
+            :description="t('artifact.missingDesc')"
           />
           <EmptyState
             v-else-if="error"
             compact
             tone="danger"
-            title="Не удалось загрузить содержимое"
+            :title="t('artifact.loadFailed')"
             :description="error"
           />
           <template v-else-if="content">
@@ -509,10 +515,10 @@ const status = computed(() => props.item.status ?? "present");
 
     <ConfirmDialog
       :open="pendingRename"
-      title="Переименовать файл"
-      description="Только имя в этой папке, без пути."
-      confirm-label="Переименовать"
-      cancel-label="Отмена"
+      :title="t('artifact.renameTitle')"
+      :description="t('artifact.renameDesc')"
+      :confirm-label="t('common.rename')"
+      :cancel-label="t('common.cancel')"
       @confirm="confirmRename"
       @cancel="pendingRename = false"
     >
@@ -527,10 +533,10 @@ const status = computed(() => props.item.status ?? "present");
 
     <ConfirmDialog
       :open="pendingDelete"
-      title="Удалить файл навсегда?"
-      :description="`${contentPath}\n\nЭто действие нельзя отменить из приложения.`"
-      confirm-label="Удалить"
-      cancel-label="Отмена"
+      :title="t('artifact.deleteTitle')"
+      :description="deleteDescription"
+      :confirm-label="t('common.delete')"
+      :cancel-label="t('common.cancel')"
       danger
       @confirm="confirmDelete"
       @cancel="pendingDelete = false"
