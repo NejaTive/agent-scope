@@ -175,6 +175,7 @@ Agent Scope is a local desktop app.
 - **macOS (Homebrew):**
 
 ```bash
+brew update
 brew upgrade --cask agent-scope
 ```
 

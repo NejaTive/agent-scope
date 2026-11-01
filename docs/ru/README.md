@@ -175,6 +175,7 @@ Agent Scope — локальное десктопное приложение.
 - **macOS (Homebrew):**
 
 ```bash
+brew update
 brew upgrade --cask agent-scope
 ```
 

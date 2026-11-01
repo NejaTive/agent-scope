@@ -322,7 +322,7 @@ function setLocale(locale: AppLocale) {
           <dt class="text-subtle">{{ t("settings.name") }}</dt>
           <dd>{{ scan.appInfo?.name ?? "Agent Scope" }}</dd>
           <dt class="text-subtle">{{ t("settings.version") }}</dt>
-          <dd class="font-mono">{{ scan.appInfo?.version ?? "0.6.0" }}</dd>
+          <dd class="font-mono">{{ scan.appInfo?.version ?? "0.6.1" }}</dd>
           <template v-if="prefs.prefs.trackClaude && scan.globalMeta.configDir">
             <dt class="text-subtle">{{ t("settings.claudeDir") }}</dt>
             <dd class="break-all font-mono">
@@ -383,13 +383,15 @@ function setLocale(locale: AppLocale) {
             </button>
           </div>
           <p v-if="statusText" class="text-xs" :class="statusTone">{{ statusText }}</p>
-          <p
+          <div
             v-if="updates.updateAvailable && scan.appInfo?.platform === 'macos'"
-            class="text-2xs text-subtle"
+            class="space-y-1 text-2xs text-subtle"
           >
-            {{ t("settings.brewHint") }}
-            <code class="font-mono text-muted">brew upgrade --cask agent-scope</code>
-          </p>
+            <p>
+              {{ t("settings.brewHint") }}
+              <code class="font-mono text-muted">{{ t("settings.brewCommand") }}</code>
+            </p>
+          </div>
           <p
             v-else-if="
               updates.updateAvailable &&

@@ -77,7 +77,8 @@ export default {
     updateAvailable: "Update available",
     updateErrorWithDetail: "Could not check for updates: {error}",
     updateError: "Could not check for updates",
-    brewHint: "Via Homebrew:",
+    brewHint: "Via Homebrew (refresh the tap first):",
+    brewCommand: "brew update\nbrew upgrade --cask agent-scope",
     installerHint: "Download the new installer from the release page.",
     defaultViewHint:
       "View-only by default. Write / rename / delete are opt-in and only for existing allowlisted files; credentials and paths outside the list are left alone.",

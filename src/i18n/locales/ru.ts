@@ -79,7 +79,8 @@ export default {
     updateAvailable: "Доступна новая версия",
     updateErrorWithDetail: "Не удалось проверить обновления: {error}",
     updateError: "Не удалось проверить обновления",
-    brewHint: "Через Homebrew:",
+    brewHint: "Через Homebrew (сначала обнови tap):",
+    brewCommand: "brew update\nbrew upgrade --cask agent-scope",
     installerHint: "Скачай новый установщик с страницы релиза.",
     defaultViewHint:
       "По умолчанию — просмотр. Запись / rename / delete — opt-in и только для существующих файлов из allowlist; credentials и пути вне списка не трогаются.",

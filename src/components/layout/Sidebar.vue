@@ -143,7 +143,7 @@ const status = computed(() => {
           class="font-mono hover:text-fg"
           :title="t('nav.appSettings')"
         >
-          v{{ scan.appInfo?.version ?? "0.6.0" }}
+          v{{ scan.appInfo?.version ?? "0.6.1" }}
         </RouterLink>
       </div>
     </div>
